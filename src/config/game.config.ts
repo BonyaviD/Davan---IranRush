@@ -19,8 +19,14 @@ export const GAME = {
   /** Max rendered people per crowd, regardless of actual count. */
   maxCrowdSprites: 140,
   /** Spacing between people in the sunflower cluster (m). */
-  crowdSpacing: 0.36,
-  personRadius: 0.22,
+  crowdSpacing: 0.42,
+  enemySpacing: 0.5,
+  personRadius: 0.24,
+  /** Boss size multiplier and contact radius (m). */
+  bossScale: 2.6,
+  bossRadius: 1.1,
+  /** Seconds the crowd pauses after beating a regular enemy group. */
+  afterFightPause: 0.35,
 
   battle: {
     targetDurationSec: 2.5,
@@ -35,6 +41,7 @@ export const GAME = {
     intro: { height: 2.6, distance: 7.5, lookAhead: 30, fov: 62 },
     run: { height: 4, distance: 8, lookAhead: 8, fov: 60 },
     battle: { height: 4.6, distance: 9, lookAhead: 4, fov: 58 },
+    boss: { height: 5.2, distance: 10.5, lookAhead: 10, fov: 60 },
   } satisfies Record<CameraMode, CameraPose>,
   /** Selectable run-camera presets (keys are shown as Persian letters in the UI). */
   cameraPresets: {

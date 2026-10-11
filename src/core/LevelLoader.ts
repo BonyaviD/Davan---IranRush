@@ -23,14 +23,20 @@ export function levelsForWorld(world: LevelData['world']): LevelData[] {
 /** Returns a list of problems; empty = valid. */
 export function validateLevel(level: LevelData): string[] {
   const errors: string[] = [];
+  const boss = level.boss;
   if (level.startCount < 1) errors.push('startCount must be >= 1');
-  if (level.enemy.count < 1) errors.push('enemy.count must be >= 1');
-  if (level.enemy.z > level.length) errors.push('enemy.z beyond length');
-  let prevZ = -Infinity;
-  for (const s of level.segments) {
-    if (s.z <= prevZ) errors.push(`segments not strictly ascending at z=${s.z}`);
-    if (s.z >= level.enemy.z) errors.push(`gate at z=${s.z} is after enemy`);
-    prevZ = s.z;
+  if (boss.hp < 1) errors.push('boss.hp must be >= 1');
+  if (boss.z > level.length) errors.push('boss.z beyond length');
+  const ascending = (zs: number[], what: string) => {
+    for (let i = 1; i < zs.length; i++) if (zs[i]! <= zs[i - 1]!) errors.push(`${what} not strictly ascending at z=${zs[i]}`);
+  };
+  ascending(level.segments.map((s) => s.z), 'segments');
+  ascending(level.enemies.map((e) => e.z), 'enemies');
+  for (const s of level.segments) if (s.z >= boss.z) errors.push(`gate at z=${s.z} is after the boss`);
+  for (const e of level.enemies) {
+    if (e.count < 1) errors.push(`enemy at z=${e.z} has no people`);
+    if (e.z >= boss.z) errors.push(`enemy at z=${e.z} is after the boss`);
+    if (level.segments.some((s) => Math.abs(s.z - e.z) < 200)) errors.push(`enemy at z=${e.z} is too close to a gate`);
   }
   return errors;
 }

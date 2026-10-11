@@ -3,11 +3,14 @@ import { GAME } from '../config/game.config';
 import { isPositiveGate } from '../core/GateLogic';
 import type { GateSegment, WorldConfig } from '../core/types';
 import { formatGate } from '../ui/digits';
-import { gateTexture } from './labels';
+import { GOLD, TURQUOISE, inked, toon } from './style/materials';
+import { gateTexture } from './style/textures';
 
-const PANEL_H = 2.4;
+const PANEL_H = 3.1;
+const postGeo = new THREE.CylinderGeometry(0.16, 0.2, 3.6, 8);
+const capGeo = new THREE.SphereGeometry(0.28, 10, 8);
 
-/** A left/right gate pair spanning the road at one z. */
+/** A left/right pair of iwan-arch gates with gold posts spanning the road at one z. */
 export class GatePair {
   readonly group = new THREE.Group();
   passed = false;
@@ -16,12 +19,11 @@ export class GatePair {
   constructor(
     readonly segment: GateSegment,
     world: WorldConfig,
-    postGeo: THREE.BufferGeometry,
-    postMat: THREE.Material,
   ) {
     const w = GAME.roadWidth;
+    const p = world.palette;
     segment.gates.forEach((gate, i) => {
-      const color = isPositiveGate(gate) ? world.palette.gatePositive : world.palette.gateNegative;
+      const color = isPositiveGate(gate) ? p.gatePositive : p.gateNegative;
       const mat = new THREE.MeshBasicMaterial({
         map: gateTexture(formatGate(gate), color),
         transparent: true,
@@ -29,16 +31,19 @@ export class GatePair {
         depthWrite: false,
       });
       this.panels.push(mat);
-      const panel = new THREE.Mesh(new THREE.PlaneGeometry(w / 2 - 0.2, PANEL_H), mat);
-      panel.position.set((i === 0 ? -1 : 1) * (w / 4), 1.6, 0);
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(w / 2 - 0.3, PANEL_H), mat);
+      panel.position.set((i === 0 ? -1 : 1) * (w / 4), 1.8, 0);
       this.group.add(panel);
     });
     for (const x of [-w / 2, 0, w / 2]) {
-      const post = new THREE.Mesh(postGeo, postMat);
-      post.position.set(x, 1.6, 0);
+      const post = inked(new THREE.Mesh(postGeo, toon(GOLD)), 0.08);
+      post.position.set(x, 1.8, 0);
       post.castShadow = true;
-      this.group.add(post);
+      const cap = inked(new THREE.Mesh(capGeo, toon(TURQUOISE)), 0.1);
+      cap.position.set(x, 3.75, 0);
+      this.group.add(post, cap);
     }
+    this.group.userData.keepGeometry = true;
     this.group.position.z = -segment.z * GAME.metersPerUnit;
   }
 

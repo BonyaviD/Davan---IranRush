@@ -1,23 +1,22 @@
 import type { WorldConfig } from '../../core/types';
 
-/** اصفهان: کاشی فیروزه‌ای و طلایی، سی‌وسه‌پل */
+/** اصفهان: کاشی فیروزه‌ای و طلایی، سی‌وسه‌پل، گنبد */
 export const isfahan: WorldConfig = {
   id: 'isfahan',
   name: 'اصفهان',
   palette: {
-    sky: 0xbfe0e8,
-    ground: 0xd9c49a,
-    road: 0xcbb489,
-    roadLine: 0x1a8f9e,
-    sidewalk: 0xb89c6a,
-    gatePositive: 0x1fb5a8,
-    gateNegative: 0xd64545,
-    crowd: 0x2f7de1,
-    enemy: 0x8e2c2c,
-    facades: [0xd8c39b, 0xcdb184, 0xe0cfa8],
-    foliage: [0x5c9945, 0x4f8a3c],
+    skyTop: 0x1f5e8e,
+    skyHorizon: 0xf3e2b0,
+    ground: 0xdcc79a,
+    road: 0xcdb48c,
+    roadLine: 0x1fa3a8,
+    gatePositive: 0x1f9a8e,
+    gateNegative: 0xbe3732,
+    walls: [0xe6d2a6, 0xdcc394, 0xeedcb4, 0xd8bd8a],
+    ridges: [0xa9b6d6, 0xd9b48f, 0xe9cf9f],
+    trees: [0x2e6a45, 0xf6d36b],
   },
   landmark: 'siosepol',
-  fog: [80, 520],
+  fog: [80, 850],
   obstacleKinds: ['static'],
 };

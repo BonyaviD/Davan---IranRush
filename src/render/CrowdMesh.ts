@@ -1,78 +1,112 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GAME } from '../config/game.config';
+import { characterGeometry, characterMaterials, type CharacterMaterials } from './characters/build';
+import type { CharacterDef } from './characters/defs';
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
-/** Low-poly person (body + head) merged into one geometry so a whole crowd is one draw call. */
-function personGeometry(): THREE.BufferGeometry {
-  const body = new THREE.CylinderGeometry(0.17, 0.22, 0.75, 7).translate(0, 0.38, 0);
-  const head = new THREE.SphereGeometry(0.19, 8, 6).translate(0, 0.95, 0);
-  const merged = mergeGeometries([body, head]);
-  body.dispose();
-  head.dispose();
-  if (!merged) throw new Error('person geometry merge failed');
-  return merged;
+interface TypeMeshes {
+  body: THREE.InstancedMesh;
+  ink: THREE.InstancedMesh;
+}
+
+export interface CrowdOptions {
+  defs: CharacterDef[];
+  /** Color of the ring under each person's feet (team marker). */
+  marker: number;
+  spacing: number;
+  /** Y rotation: 0 faces down the road (-z), PI faces the player. */
+  facing: number;
+  /** Limb swing amplitude while running. */
+  runAmp: number;
+  max?: number;
 }
 
 /**
- * A crowd rendered as one InstancedMesh with a fixed capacity.
- * People sit in a sunflower (Vogel) cluster and ease toward their slot every frame.
- * Rendered amount is min(count, max): cosmetic only. update() allocates nothing.
+ * A crowd of mixed characters in a sunflower (Vogel) cluster. Person i uses character
+ * type i % types and slot floor(i / types) of that type's InstancedMesh, so the whole crowd
+ * costs two draw calls per character type at any size. Rendered amount is
+ * min(count, max): cosmetic only. update() allocates nothing.
  */
 export class CrowdMesh {
-  readonly mesh: THREE.InstancedMesh;
+  readonly group = new THREE.Group();
   centerX = 0;
   centerZ = 0;
 
-  private readonly material: THREE.MeshLambertMaterial;
+  private readonly types: TypeMeshes[];
+  private readonly mats: CharacterMaterials;
+  private readonly max: number;
   private readonly slotX: Float32Array;
   private readonly slotZ: Float32Array;
   private readonly posX: Float32Array;
   private readonly posZ: Float32Array;
-  private readonly phase: Float32Array;
+  private readonly scale: Float32Array;
   private readonly dummy = new THREE.Object3D();
   private shown = 0;
+  private running = false;
 
-  constructor(private readonly max = GAME.maxCrowdSprites) {
-    this.material = new THREE.MeshLambertMaterial();
-    this.mesh = new THREE.InstancedMesh(personGeometry(), this.material, max);
-    this.mesh.castShadow = true;
-    this.mesh.frustumCulled = false;
-    this.mesh.count = 0;
+  constructor(private readonly opts: CrowdOptions) {
+    this.max = opts.max ?? GAME.maxCrowdSprites;
+    this.mats = characterMaterials(opts.runAmp);
+    const T = opts.defs.length;
+    const perType = Math.ceil(this.max / T);
+    const color = new THREE.Color();
+    this.types = opts.defs.map((def, t) => {
+      const geo = characterGeometry(def, opts.marker).clone();
+      const hair = new THREE.InstancedBufferAttribute(new Float32Array(perType * 3), 3);
+      geo.setAttribute('hairColor', hair);
+      const body = new THREE.InstancedMesh(geo, this.mats.body, perType);
+      const ink = new THREE.InstancedMesh(geo, this.mats.ink, perType);
+      body.castShadow = true;
+      body.frustumCulled = ink.frustumCulled = false;
+      body.count = ink.count = 0;
+      for (let s = 0; s < perType; s++) {
+        const i = s * T + t; // person index → varied but stable colors
+        body.setColorAt(s, color.setHex(def.cloth ? def.cloth[(i * 7) % def.cloth.length]! : 0xffffff));
+        color.setHex(def.hair ? def.hair[(i * 5) % def.hair.length]! : 0);
+        hair.setXYZ(s, color.r, color.g, color.b);
+      }
+      this.group.add(body, ink);
+      return { body, ink };
+    });
 
-    this.slotX = new Float32Array(max);
-    this.slotZ = new Float32Array(max);
-    this.posX = new Float32Array(max);
-    this.posZ = new Float32Array(max);
-    this.phase = new Float32Array(max);
-    for (let i = 0; i < max; i++) {
-      const r = GAME.crowdSpacing * Math.sqrt(i);
+    this.slotX = new Float32Array(this.max);
+    this.slotZ = new Float32Array(this.max);
+    this.posX = new Float32Array(this.max);
+    this.posZ = new Float32Array(this.max);
+    this.scale = new Float32Array(this.max);
+    for (let i = 0; i < this.max; i++) {
+      const r = opts.spacing * Math.sqrt(i);
       const a = i * GOLDEN_ANGLE;
       this.slotX[i] = Math.cos(a) * r;
       this.slotZ[i] = Math.sin(a) * r;
-      this.phase[i] = (i * 1.7) % (Math.PI * 2);
+      this.scale[i] = 0.94 + ((i * 37) % 11) / 100;
     }
-  }
-
-  setColor(color: number): void {
-    this.material.color.setHex(color);
   }
 
   /** Cluster radius in meters for the currently shown people. */
   get radius(): number {
-    return GAME.crowdSpacing * Math.sqrt(Math.max(0, this.shown - 1)) + GAME.personRadius;
+    return this.opts.spacing * Math.sqrt(Math.max(0, this.shown - 1)) + GAME.personRadius;
   }
 
   setCount(count: number): void {
     const n = Math.min(this.max, Math.max(0, Math.floor(count)));
     for (let i = this.shown; i < n; i++) {
-      // New people appear at the center and spread outward.
       this.posX[i] = this.centerX;
       this.posZ[i] = this.centerZ;
     }
     this.shown = n;
-    this.mesh.count = n;
+    const T = this.types.length;
+    this.types.forEach((ty, t) => (ty.body.count = ty.ink.count = n > t ? Math.ceil((n - t) / T) : 0));
+  }
+
+  setRunning(running: boolean): void {
+    this.running = running;
+    this.mats.run.value = running ? this.opts.runAmp : 0.15;
+  }
+
+  setInkVisible(on: boolean): void {
+    for (const ty of this.types) ty.ink.visible = on;
   }
 
   snap(): void {
@@ -82,18 +116,37 @@ export class CrowdMesh {
     }
   }
 
-  update(dt: number, time: number, running: boolean): void {
+  update(dt: number, time: number): void {
     const k = 1 - Math.exp(-14 * dt);
     const d = this.dummy;
+    const T = this.types.length;
+    const run = this.running;
     for (let i = 0; i < this.shown; i++) {
       const x = (this.posX[i]! += (this.centerX + this.slotX[i]! - this.posX[i]!) * k);
       const z = (this.posZ[i]! += (this.centerZ + this.slotZ[i]! - this.posZ[i]!) * k);
-      const s = running ? Math.sin(time * 11 + this.phase[i]!) : 0;
-      d.position.set(x, running ? Math.abs(s) * 0.12 : 0, z);
-      d.rotation.set(s * 0.08, 0, 0);
+      const s = run ? Math.sin(time * 11 + i * 1.7) : Math.sin(time * 2 + i * 1.7) * 0.2;
+      d.position.set(x, run ? Math.abs(s) * 0.07 : 0, z);
+      d.rotation.set(run ? 0.12 : 0, this.opts.facing + (run ? 0 : s * 0.2), 0);
+      d.scale.setScalar(this.scale[i]!);
       d.updateMatrix();
-      this.mesh.setMatrixAt(i, d.matrix);
+      const ty = this.types[i % T]!;
+      const slot = (i / T) | 0;
+      ty.body.setMatrixAt(slot, d.matrix);
+      ty.ink.setMatrixAt(slot, d.matrix);
     }
-    this.mesh.instanceMatrix.needsUpdate = true;
+    for (const ty of this.types) {
+      ty.body.instanceMatrix.needsUpdate = true;
+      ty.ink.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  dispose(): void {
+    for (const ty of this.types) {
+      ty.body.geometry.dispose();
+      ty.body.dispose();
+      ty.ink.dispose();
+    }
+    this.mats.body.dispose();
+    this.mats.ink.dispose();
   }
 }

@@ -24,6 +24,7 @@ export class CameraRig {
       intro: { ...GAME.camera.intro, ...o.intro },
       run: { ...GAME.camera.run, ...o.run },
       battle: { ...GAME.camera.battle, ...o.battle },
+      boss: { ...GAME.camera.boss, ...o.boss },
     };
     this.applyOverride();
   }
@@ -65,6 +66,7 @@ export class CameraRig {
     if (run) {
       this.poses.run = { ...run };
       this.poses.battle = { ...run, height: run.height + 0.6, distance: run.distance + 1, lookAhead: Math.min(run.lookAhead, 4) };
+      this.poses.boss = { ...run, height: run.height + 1.2, distance: run.distance + 2.5, lookAhead: Math.max(run.lookAhead, 10) };
     }
     this.target = this.poses[this.mode];
   }

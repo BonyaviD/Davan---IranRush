@@ -1,5 +1,5 @@
 /**
- * Shared data contracts. Pure types only: no Phaser, no DOM.
+ * Shared data contracts. Pure types only: no engine, no DOM.
  * Distances are in "track units" (z), measured from the start line upward.
  */
 
@@ -31,39 +31,53 @@ export interface ObstacleDef {
   speed?: number;
 }
 
+/** A group of regular enemies (divs) standing on the path. */
 export interface EnemyDef {
   z: number;
   count: number;
+}
+
+export type BossKind = 'zahhak' | 'div-sepid';
+
+/** The giant at the end of every path. hp works like an enemy count. */
+export interface BossDef {
+  z: number;
+  hp: number;
+  kind: BossKind;
 }
 
 export interface LevelData {
   id: string;
   world: WorldId;
   startCount: number;
-  /** Total track length; the run ends (battle) at enemy.z, length is the visual end. */
+  /** Total track length (scenery extends a bit beyond it). */
   length: number;
   segments: GateSegment[];
   obstacles?: ObstacleDef[];
-  enemy: EnemyDef;
+  /** Enemy groups along the path, ascending z, all before the boss. */
+  enemies: EnemyDef[];
+  boss: BossDef;
 }
 
 export type WorldId = 'bazaar' | 'isfahan' | 'tehran';
 
 export type LandmarkId = 'bazaar-dome' | 'siosepol' | 'milad';
 
+/** Miniature-painting palette for one world. */
 export interface WorldPalette {
-  sky: number;
+  skyTop: number;
+  skyHorizon: number;
   ground: number;
   road: number;
   roadLine: number;
-  sidewalk: number;
   gatePositive: number;
   gateNegative: number;
-  crowd: number;
-  enemy: number;
-  /** Building/wall colors picked in rotation. */
-  facades: number[];
-  foliage: number[];
+  /** Facade wall colors, used in a repeating rhythm. */
+  walls: number[];
+  /** Three mountain ridges, back to front. */
+  ridges: [number, number, number];
+  /** Tree crowns: [cypress, blossom]. */
+  trees: [number, number];
 }
 
 /** Camera placement relative to the crowd (meters / degrees). */
@@ -89,6 +103,6 @@ export interface WorldConfig {
   night?: boolean;
 }
 
-export type CameraMode = 'intro' | 'run' | 'battle';
+export type CameraMode = 'intro' | 'run' | 'battle' | 'boss';
 
 export type RunResult = 'win' | 'lose';

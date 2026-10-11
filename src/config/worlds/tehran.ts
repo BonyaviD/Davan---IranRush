@@ -1,23 +1,22 @@
 import type { WorldConfig } from '../../core/types';
 
-/** تهران: خیابان چناری، برج میلاد، البرز، ترافیک عرضی */
+/** تهران: خیابان چناری با سرو و شکوفه، برج میلاد، رشته‌کوه البرز */
 export const tehran: WorldConfig = {
   id: 'tehran',
   name: 'تهران',
   palette: {
-    sky: 0xf3c58f,
-    ground: 0xcfb08a,
-    road: 0x45464c,
-    roadLine: 0xf2f2f2,
-    sidewalk: 0xb9a58c,
-    gatePositive: 0x2ecc71,
-    gateNegative: 0xe74c3c,
-    crowd: 0x2f7de1,
-    enemy: 0xc8372d,
-    facades: [0xd8c3a0, 0xc7a27c, 0xe2d6c2, 0xb88a64, 0xcdb9a0],
-    foliage: [0x4f8a3c, 0x5c9945, 0x46803a],
+    skyTop: 0x23408e,
+    skyHorizon: 0xf7dfa0,
+    ground: 0xd9c99a,
+    road: 0x9b8fa6,
+    roadLine: 0xe2b04a,
+    gatePositive: 0x23966e,
+    gateNegative: 0xbe3732,
+    walls: [0xf3e3c3, 0xeed2b0, 0xf6e8d2, 0xe8c9a4],
+    ridges: [0xb99ac7, 0xe7a39a, 0xefc193],
+    trees: [0x2e6a45, 0xf3a9bd],
   },
   landmark: 'milad',
-  fog: [90, 650],
+  fog: [90, 900],
   obstacleKinds: ['static', 'crossing'],
 };

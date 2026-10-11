@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LEVELS } from '../src/config/levels';
 import { validateLevel } from '../src/core/LevelLoader';
-import { countRange } from '../src/core/RunLogic';
+import { allOutcomes, simulateRun } from '../src/core/RunLogic';
 import { CrowdModel } from '../src/core/CrowdModel';
 import { toFaDigits } from '../src/ui/digits';
 
@@ -10,10 +10,18 @@ describe.each(LEVELS.map((l) => [l.id, l] as const))('level %s', (_id, level) =>
     expect(validateLevel(level)).toEqual([]);
   });
 
-  it('best choices win, worst choices lose', () => {
-    const { best, worst } = countRange(level);
-    expect(best).toBeGreaterThan(level.enemy.count);
-    expect(worst).toBeLessThanOrEqual(level.enemy.count);
+  it('good choices beat the boss, bad choices lose', () => {
+    const outcomes = allOutcomes(level);
+    expect(outcomes.some((o) => o.result === 'win')).toBe(true);
+    expect(outcomes.some((o) => o.result === 'lose')).toBe(true);
+  });
+});
+
+describe('simulateRun', () => {
+  it('plays the tehran-01 best path through both div groups and Zahhak', () => {
+    const tehran = LEVELS.find((l) => l.id === 'tehran-01')!;
+    expect(simulateRun(tehran, [0, 0, 1, 1, 0])).toEqual({ count: 50, result: 'win' });
+    expect(simulateRun(tehran, [0, 1, 1, 1, 0]).result).toBe('lose');
   });
 });
 
