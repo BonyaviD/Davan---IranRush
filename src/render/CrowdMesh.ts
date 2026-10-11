@@ -84,9 +84,16 @@ export class CrowdMesh {
     }
   }
 
+  /** Packing factor: 1 for small crowds, < 1 once the cluster would exceed crowdMaxRadius. */
+  private get pack(): number {
+    const natural = this.opts.spacing * Math.sqrt(Math.max(0, this.shown - 1));
+    const room = GAME.crowdMaxRadius - GAME.personRadius;
+    return natural > room ? room / natural : 1;
+  }
+
   /** Cluster radius in meters for the currently shown people. */
   get radius(): number {
-    return this.opts.spacing * Math.sqrt(Math.max(0, this.shown - 1)) + GAME.personRadius;
+    return this.opts.spacing * Math.sqrt(Math.max(0, this.shown - 1)) * this.pack + GAME.personRadius;
   }
 
   setCount(count: number): void {
@@ -110,9 +117,10 @@ export class CrowdMesh {
   }
 
   snap(): void {
+    const pack = this.pack;
     for (let i = 0; i < this.shown; i++) {
-      this.posX[i] = this.centerX + this.slotX[i]!;
-      this.posZ[i] = this.centerZ + this.slotZ[i]!;
+      this.posX[i] = this.centerX + this.slotX[i]! * pack;
+      this.posZ[i] = this.centerZ + this.slotZ[i]! * pack;
     }
   }
 
@@ -121,9 +129,10 @@ export class CrowdMesh {
     const d = this.dummy;
     const T = this.types.length;
     const run = this.running;
+    const pack = this.pack;
     for (let i = 0; i < this.shown; i++) {
-      const x = (this.posX[i]! += (this.centerX + this.slotX[i]! - this.posX[i]!) * k);
-      const z = (this.posZ[i]! += (this.centerZ + this.slotZ[i]! - this.posZ[i]!) * k);
+      const x = (this.posX[i]! += (this.centerX + this.slotX[i]! * pack - this.posX[i]!) * k);
+      const z = (this.posZ[i]! += (this.centerZ + this.slotZ[i]! * pack - this.posZ[i]!) * k);
       const s = run ? Math.sin(time * 11 + i * 1.7) : Math.sin(time * 2 + i * 1.7) * 0.2;
       d.position.set(x, run ? Math.abs(s) * 0.07 : 0, z);
       d.rotation.set(run ? 0.12 : 0, this.opts.facing + (run ? 0 : s * 0.2), 0);

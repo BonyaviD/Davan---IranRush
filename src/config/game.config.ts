@@ -22,6 +22,8 @@ export const GAME = {
   crowdSpacing: 0.42,
   enemySpacing: 0.5,
   personRadius: 0.24,
+  /** Big crowds pack tighter so the cluster never exceeds this radius (m) and can always steer. */
+  crowdMaxRadius: 3,
   /** Boss size multiplier and contact radius (m). */
   bossScale: 2.6,
   bossRadius: 1.1,
