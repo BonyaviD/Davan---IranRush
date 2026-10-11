@@ -16,9 +16,15 @@ export interface BattleConfig {
 
 export const DEFAULT_BATTLE: BattleConfig = { targetDurationSec: 2.5, tickSec: 0.05 };
 
+/** Fight length in seconds: quick skirmishes for small groups, up to the full target for big ones. */
+export function battleDuration(state: BattleState, cfg: BattleConfig = DEFAULT_BATTLE): number {
+  const smaller = Math.min(state.player, state.enemy);
+  return Math.min(cfg.targetDurationSec, 0.8 + smaller * 0.03);
+}
+
 /** People removed from each side per tick, fixed for the whole battle. */
 export function lossPerTick(state: BattleState, cfg: BattleConfig = DEFAULT_BATTLE): number {
-  const ticks = Math.max(1, Math.round(cfg.targetDurationSec / cfg.tickSec));
+  const ticks = Math.max(1, Math.round(battleDuration(state, cfg) / cfg.tickSec));
   const smaller = Math.min(state.player, state.enemy);
   return Math.max(1, Math.ceil(smaller / ticks));
 }

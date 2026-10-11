@@ -1,5 +1,5 @@
 import { applyGate } from './GateLogic';
-import type { BossKind, EnemyDef, GateDef, GateSegment, LevelData, ObstacleDef, WorldId } from './types';
+import type { BossKind, EnemyDef, GateDef, GateSegment, LevelData, WorldId } from './types';
 
 /**
  * Procedural level generator with a difficulty curve.
@@ -12,8 +12,12 @@ import type { BossKind, EnemyDef, GateDef, GateSegment, LevelData, ObstacleDef, 
  * generator retries until the worst path loses.
  *
  * Difficulty d in [0, 1] controls: level length, how big enemies are relative to the crowd,
- * how thin the final margin is, how subtle the gate choices are, and how many obstacles and
- * mystery gates appear.
+ * how thin the final margin is, how subtle the gate choices are, and how many small div
+ * patrols and mystery gates appear.
+ *
+ * Mystery gates stay hidden until the crowd has passed them, so the pick is blind. To keep
+ * that fair, both sides of a mystery pair are positive, and the generator assumes the
+ * unlucky (smaller) side when sizing what comes after.
  */
 
 export const WORLD_ROTATION: WorldId[] = ['tehran', 'isfahan', 'bazaar'];
@@ -54,11 +58,11 @@ function nice(v: number): number {
 const better = (a: GateDef, b: GateDef, count: number) => applyGate(a, count) >= applyGate(b, count);
 
 /** One gate pair suited to the current best-path count and difficulty. */
-function makeGates(rand: () => number, best: number, d: number): [GateDef, GateDef] {
+function makeGates(rand: () => number, best: number, d: number): { gates: [GateDef, GateDef]; hidden: boolean } {
   const u = (a: number, b: number) => a + rand() * (b - a);
   // Soft cap on crowd size: past it the generator stops offering multiplies.
   const cap = 70 + 230 * d;
-  const hidden = rand() < 0.08 + 0.35 * d;
+  const hidden = rand() < 0.06 + 0.2 * d;
   const H = (g: GateDef): GateDef => (hidden ? { ...g, hidden: true } : g);
 
   // Weighted template choice: easy pairs early, subtle and "lesser evil" pairs later.
@@ -70,8 +74,13 @@ function makeGates(rand: () => number, best: number, d: number): [GateDef, GateD
     mulDiv: growthOk ? 1 - 0.5 * d : 0.03,
     mulAdd: growthOk ? 0.5 + 1.2 * d : 0.05,
     addAdd: 0.3 + 0.4 * d,
-    bothBad: 0.05 + 0.9 * d,
+    bothBad: best >= 25 ? 0.05 + 0.9 * d : 0,
   };
+  if (hidden) {
+    // Blind picks only offer good-vs-better choices.
+    w.addSub = w.mulDiv = w.bothBad = 0;
+    if (!growthOk) w.mulAdd = 0;
+  }
   const total = Object.values(w).reduce((s, x) => s + x, 0);
   let r = rand() * total;
   let pick: keyof typeof w = 'addSub';
@@ -112,8 +121,8 @@ function makeGates(rand: () => number, best: number, d: number): [GateDef, GateD
       break;
   }
   if (better(b, a, best) && applyGate(a, best) === applyGate(b, best)) b = { ...b, value: b.value + 1 };
-  const pair: [GateDef, GateDef] = rand() < 0.5 ? [H(a), H(b)] : [H(b), H(a)];
-  return pair;
+  const gates: [GateDef, GateDef] = rand() < 0.5 ? [H(a), H(b)] : [H(b), H(a)];
+  return { gates, hidden };
 }
 
 interface Plan {
@@ -121,30 +130,6 @@ interface Plan {
   boss: BossKind;
   index: number;
   id: string;
-}
-
-function obstacleFor(world: WorldId, rand: () => number, z: number, d: number): ObstacleDef {
-  const damage = Math.round(4 + d * 8);
-  if (world === 'tehran') {
-    const motor = rand() < 0.4;
-    return {
-      z,
-      kind: 'crossing',
-      x: rand() < 0.5 ? -1 : 1,
-      halfWidth: motor ? 0.22 : 0.34,
-      damage: motor ? damage - 2 : damage,
-      speed: (motor ? 0.65 : 0.4) + d * 0.35,
-      look: motor ? 'motor' : 'taxi',
-    };
-  }
-  return {
-    z,
-    kind: 'static',
-    x: Math.round((rand() * 1.2 - 0.6) * 10) / 10,
-    halfWidth: world === 'bazaar' ? 0.34 : 0.28,
-    damage,
-    look: world === 'bazaar' ? 'cart' : 'urn',
-  };
 }
 
 /** Builds one level; returns null if this seed did not satisfy the constraints. */
@@ -156,45 +141,49 @@ function tryGenerate(plan: Plan, seed: number): LevelData | null {
 
   const segments: GateSegment[] = [];
   const enemies: EnemyDef[] = [];
-  const obstacles: ObstacleDef[] = [];
   let best = startCount;
   let worst = startCount;
-  let damage = 0;
   let z = 500;
   let sinceFight = 0;
 
   for (let s = 0; s < sections; s++) {
     const gap = 620 + Math.floor(rand() * 220);
     const last = s === sections - 1;
-    const wantFight = s >= 2 && !last && sinceFight >= 2 && rand() < 0.35 + 0.25 * d;
+    const wantFight = s >= 2 && !last && sinceFight >= 2 && best > 12 && rand() < 0.35 + 0.25 * d;
     if (wantFight) {
-      const ratio = 0.3 + 0.35 * d + (rand() - 0.5) * 0.1;
+      const ratio = 0.3 + 0.42 * d + (rand() - 0.5) * 0.1;
       const count = Math.max(3, Math.min(best - 3, nice(best * ratio)));
+      if (count >= best) return null;
       enemies.push({ z, count });
       best -= count;
       worst = worst > count ? worst - count : 0;
       sinceFight = 0;
     } else {
-      const gates = makeGates(rand, best, d);
+      const { gates, hidden } = makeGates(rand, best, d);
       segments.push({ z, gates });
-      best = Math.max(applyGate(gates[0], best), applyGate(gates[1], best));
+      const ga = applyGate(gates[0], best);
+      const gb = applyGate(gates[1], best);
+      // Hidden pairs: plan for the unlucky side, since the player can't see the values.
+      best = hidden ? Math.min(ga, gb) : Math.max(ga, gb);
       worst = worst > 0 ? Math.min(applyGate(gates[0], worst), applyGate(gates[1], worst)) : 0;
       sinceFight++;
     }
-    // Obstacles sit halfway to the next section.
-    if (!last && s >= 1 && rand() < 0.15 + 0.4 * d) {
-      const o = obstacleFor(plan.world, rand, z + Math.round(gap / 2), d);
-      obstacles.push(o);
-      damage += o.damage;
+    // Small div patrols sit halfway to the next section.
+    if (!last && s >= 1 && best > 12 && rand() < 0.1 + 0.15 * d) {
+      const count = Math.max(2, Math.min(best - 3, nice(best * (0.08 + 0.12 * d))));
+      if (count >= 2 && best - count > 5) {
+        enemies.push({ z: z + Math.round(gap / 2), count });
+        best -= count;
+        worst = worst > count ? worst - count : 0;
+      }
     }
     z += gap;
   }
 
   // Boss: a thinner margin as difficulty rises, but always beatable even after some hits.
   const bossZ = z + 150;
-  // The margin left after the boss must still absorb some obstacle hits (most are avoidable).
-  const hp = nice(best * (0.5 + 0.4 * d));
-  if (hp < 15 || best - hp < Math.max(3, Math.ceil(damage * 0.35))) return null;
+  const hp = nice(best * (0.5 + 0.43 * d));
+  if (hp < 15 || best - hp < 3) return null;
   if (worst > hp) return null; // the worst path must lose
 
   return {
@@ -203,7 +192,6 @@ function tryGenerate(plan: Plan, seed: number): LevelData | null {
     startCount,
     length: bossZ + 400,
     segments,
-    obstacles,
     enemies,
     boss: { z: bossZ, hp, kind: plan.boss },
   };

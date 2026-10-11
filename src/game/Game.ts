@@ -37,8 +37,6 @@ const ENEMY_MARKER = 0xc0392b;
 /** Draw distance for gates, obstacles and enemy groups (m behind / ahead of the crowd). */
 const CULL_BEHIND = 25;
 const CULL_AHEAD = 170;
-/** Mystery gates reveal their values this close (m). */
-const REVEAL_DISTANCE = 9;
 
 export interface GameEvents {
   /** A run ended; the app shows the result and pays rewards. */
@@ -292,10 +290,6 @@ export class Game {
     this.steerX = damp(this.steerX, this.input.target, GAME.steerLerp, dt);
 
     const segs = this.level.segments;
-    for (let i = this.nextSegment; i < this.gates.length; i++) {
-      const gate = this.gates[i]!;
-      if (!gate.revealed && (segs[i]!.z - this.distance) * GAME.metersPerUnit < REVEAL_DISTANCE) gate.reveal();
-    }
     while (this.nextSegment < segs.length && segs[this.nextSegment]!.z <= this.distance) {
       const seg = segs[this.nextSegment]!;
       if (seg.z > prev) this.passGate(this.nextSegment, laneIndex(this.steerX));
@@ -340,6 +334,7 @@ export class Game {
 
   private passGate(index: number, lane: 0 | 1): void {
     const gate = this.level.segments[index]!.gates[lane];
+    // Mystery gates show what was behind them only after the crowd has gone through.
     this.gates[index]!.reveal();
     this.model.passGate(gate);
     this.gates[index]!.markPassed(lane);

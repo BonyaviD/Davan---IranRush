@@ -4,12 +4,27 @@ import { LEVELS } from '../src/config/levels';
 import { CrowdModel } from '../src/core/CrowdModel';
 import { difficulty, generateCampaign } from '../src/core/LevelGen';
 import { validateLevel } from '../src/core/LevelLoader';
-import { greedyChoices, randomWinRate, simulateRun } from '../src/core/RunLogic';
+import { greedyChoices, pathEvents, randomWinRate, simulateRun } from '../src/core/RunLogic';
+import { battleDuration } from '../src/core/BattleLogic';
+import { applyGate } from '../src/core/GateLogic';
 import type { LevelData } from '../src/core/types';
 import { toFaDigits } from '../src/ui/digits';
 
-/** Rough play time in seconds: running + ~2.5 s per fight + intro. */
-const playSeconds = (l: LevelData) => l.length / GAME.runSpeed + (l.enemies.length + 1) * 2.5 + GAME.introSec;
+/** Play time in seconds on the best path: running + each fight's length + intro. */
+function playSeconds(l: LevelData): number {
+  const choices = greedyChoices(l, 'best');
+  let count = l.startCount;
+  let fights = 0;
+  for (const ev of pathEvents(l)) {
+    if (ev.kind === 'gate') count = applyGate(l.segments[ev.index]!.gates[choices[ev.index]!], count);
+    else {
+      const foe = ev.kind === 'enemy' ? l.enemies[ev.index]!.count : l.boss.hp;
+      fights += battleDuration({ player: count, enemy: foe }) + GAME.afterFightPause;
+      count -= foe;
+    }
+  }
+  return l.length / GAME.runSpeed + fights + GAME.introSec;
+}
 
 describe.each(LEVELS.map((l) => [l.id, l] as const))('level %s', (_id, level) => {
   it('is valid', () => {
