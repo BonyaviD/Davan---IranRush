@@ -19,10 +19,12 @@ npm run android       # build + sync + باز کردن پروژه در Android S
 npm run ios           # build + sync + باز کردن پروژه در Xcode
 npm run android:apk   # ساخت مستقیم APK دیباگ (به Android SDK نیاز داره)
 ```
-- **APK بدون نصب هیچ ابزاری:** با هر push، GitHub Actions (`.github/workflows/android-apk.yml`) یک APK دیباگ می‌سازه. در صفحه‌ی GitHub → Actions → آخرین اجرای «Android APK» → بخش Artifacts → `davan-debug-apk` رو دانلود کن، zip رو باز کن و `app-debug.apk` رو روی گوشی نصب کن (نصب از منابع ناشناس باید مجاز باشه).
+- **APK بدون نصب هیچ ابزاری:** با هر push، GitHub Actions (`.github/workflows/android-apk.yml`) یک APK می‌سازه. در صفحه‌ی GitHub → Actions → آخرین اجرای «Android APK» → بخش Artifacts → `davan-apk` رو دانلود کن، zip رو باز کن و `davan.apk` رو روی گوشی نصب کن.
+  - اگه Play Protect هشدار داد («ممکنه مخرب باشه»): روی «جزئیات بیشتر» و بعد «در هر صورت نصب شود» بزن. این هشدار برای هر اپی که از Google Play نیومده نشون داده می‌شه.
+  - APKها با یک کلید تستی ثابت (`android/app/davan-test.keystore`) امضا می‌شن و شماره‌ی نسخه هر بار بالا می‌ره، پس نسخه‌ی جدید روی قبلی نصب می‌شه. برای Google Play یک کلید خصوصی بساز و در git نذار.
 - **Android:** در Android Studio دکمه‌ی Run برای گوشی وصل‌شده؛ برای Google Play از منوی Build → Generate Signed Bundle یک فایل AAB بساز.
 - **iOS:** در Xcode تیم امضا (Signing & Capabilities) رو انتخاب کن، بعد Run یا Product → Archive برای App Store.
-- **شناسه‌ی اپ:** فعلاً `com.example.davan` هست (در `capacitor.config.ts`). قبل از انتشار به شناسه‌ی خودت تغییرش بده، بعد `npx cap sync` بزن.
+- **شناسه‌ی اپ:** `com.davan.iranrush` (در `capacitor.config.ts`، `android/app/build.gradle` و پروژه‌ی Xcode).
 - اپ فقط عمودی (portrait) و تمام‌صفحه هست؛ نوار وضعیت مخفی می‌شه.
 
 ## مدل بازی

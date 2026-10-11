@@ -1,4 +1,4 @@
-package com.example.davan;
+package com.davan.iranrush;
 
 import com.getcapacitor.BridgeActivity;
 

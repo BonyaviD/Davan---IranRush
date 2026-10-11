@@ -1,14 +1,15 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.example.davan"
+    namespace = "com.davan.iranrush"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.example.davan"
+        applicationId "com.davan.iranrush"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // CI passes the run number so every new APK installs over the previous one.
+        versionCode((System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger() + 1)
+        versionName "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "0"}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +17,22 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Test-only signing key, committed so every build (local or CI) shares one signature and
+    // updates install cleanly. Use a private key, kept out of git, for Google Play.
+    signingConfigs {
+        test {
+            storeFile file('davan-test.keystore')
+            storePassword 'davantest'
+            keyAlias 'davan'
+            keyPassword 'davantest'
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.test
+        }
         release {
+            signingConfig signingConfigs.test
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

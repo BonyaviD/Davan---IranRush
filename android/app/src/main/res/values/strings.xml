@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Davan</string>
-    <string name="title_activity_main">Davan</string>
-    <string name="package_name">com.example.davan</string>
-    <string name="custom_url_scheme">com.example.davan</string>
+    <string name="app_name">دوان</string>
+    <string name="title_activity_main">دوان</string>
+    <string name="package_name">com.davan.iranrush</string>
+    <string name="custom_url_scheme">com.davan.iranrush</string>
 </resources>

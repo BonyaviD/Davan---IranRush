@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  // Placeholder id: change to your own reverse-domain id before publishing.
-  appId: 'com.example.davan',
+  // App id used by both stores. Change before publishing if you own a domain for it.
+  appId: 'com.davan.iranrush',
   appName: 'Davan',
   webDir: 'dist',
   backgroundColor: '#1d2a52',
