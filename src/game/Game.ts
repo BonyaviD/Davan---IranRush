@@ -222,7 +222,8 @@ export class Game {
   private setPhase(phase: Phase): void {
     this.phase = phase;
     this.phaseTime = 0;
-    this.input.enabled = phase === 'run';
+    // Steering stays live through fights and pauses so players can aim for the next gate early.
+    this.input.enabled = phase === 'run' || phase === 'fight' || phase === 'pause';
     this.crowd.setRunning(phase === 'run' || phase === 'fight');
     if (phase === 'run') this.rig.setMode('run');
     if (phase === 'fight') this.rig.setMode(this.opponent?.kind === 'boss' ? 'boss' : 'battle');
@@ -263,7 +264,6 @@ export class Game {
       this.battle = { player: this.model.count, enemy: group ? group.count : this.level.boss.hp };
       this.battlePerTick = lossPerTick(this.battle, GAME.battle);
       this.battleAcc = 0;
-      this.input.target = 0;
       if (group) group.crowd.setRunning(true);
       else this.boss?.setFighting(true);
       this.setPhase('fight');
