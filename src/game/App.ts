@@ -7,7 +7,6 @@ import { ads } from '../services/Ads';
 import { track } from '../services/Analytics';
 import { audio } from '../services/Audio';
 import { loadProgress, saveProgress } from '../services/Storage';
-import { CameraPanel } from '../ui/CameraPanel';
 import { toFaDigits } from '../ui/digits';
 import { Menu } from '../ui/Menu';
 import { ResultPanel } from '../ui/ResultPanel';
@@ -22,7 +21,6 @@ export class App {
   private readonly menu: Menu;
   private readonly shop: Shop;
   private readonly preview = new ShopPreview();
-  private readonly camera: CameraPanel;
   private result: ResultPanel | null = null;
 
   private constructor(
@@ -36,16 +34,11 @@ export class App {
       onFinish: (r, i, s) => this.onFinish(r, i, s),
       onMenu: () => this.toMenu(),
     });
-    this.camera = new CameraPanel({
-      onPose: (pose) => this.game.setCameraPose(pose),
-      onAutoZoom: (on) => this.game.setAutoZoom(on),
-    });
     this.applyCrowd();
 
     this.menu = new Menu(LEVELS, {
       onPlay: (i) => this.play(i),
       onShop: () => this.openShop(),
-      onCamera: () => this.camera.open(),
       onSound: (on) => this.update({ ...this.progress, sound: on }),
       onTap: () => audio.play('tap'),
     });

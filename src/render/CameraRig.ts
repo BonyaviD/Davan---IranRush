@@ -5,16 +5,14 @@ import type { CameraMode, CameraPose, WorldConfig } from '../core/types';
 
 /**
  * Follows the crowd from behind and above. Each mode is a pose from config (optionally
- * overridden per world); switching modes blends smoothly. With auto-zoom on, the camera
- * pulls back as the crowd grows so the whole group stays in view.
+ * overridden per world); switching modes blends smoothly. The camera always pulls back as
+ * the crowd grows so the whole group stays in view.
  */
 export class CameraRig {
-  autoZoom = true;
   private readonly pose: CameraPose = { ...GAME.camera.run };
   private target: CameraPose = { ...GAME.camera.run };
   private mode: CameraMode = 'run';
   private poses: Record<CameraMode, CameraPose> = { ...GAME.camera };
-  private runOverride: CameraPose | null = null;
   private shake = 0;
 
   constructor(private readonly camera: THREE.PerspectiveCamera) {}
@@ -27,13 +25,7 @@ export class CameraRig {
       battle: { ...GAME.camera.battle, ...o.battle },
       boss: { ...GAME.camera.boss, ...o.boss },
     };
-    this.applyOverride();
-  }
-
-  /** Player-chosen run pose; battle is derived from it. */
-  setRunPose(pose: CameraPose): void {
-    this.runOverride = { ...pose };
-    this.applyOverride();
+    this.target = this.poses[this.mode];
   }
 
   setMode(mode: CameraMode, snap = false): void {
@@ -51,7 +43,7 @@ export class CameraRig {
     const p = this.pose;
     const t = this.target;
     const z = GAME.cameraCrowdZoom;
-    const extra = this.autoZoom && this.mode !== 'intro' ? Math.max(0, crowdRadius - z.baseRadius) : 0;
+    const extra = this.mode !== 'intro' ? Math.max(0, crowdRadius - z.baseRadius) : 0;
     const r = GAME.cameraLerp;
     p.height = damp(p.height, t.height + extra * z.height, r, dt);
     p.distance = damp(p.distance, t.distance + extra * z.distance, r, dt);
@@ -68,15 +60,5 @@ export class CameraRig {
       this.camera.fov = p.fov;
       this.camera.updateProjectionMatrix();
     }
-  }
-
-  private applyOverride(): void {
-    const run = this.runOverride;
-    if (run) {
-      this.poses.run = { ...run };
-      this.poses.battle = { ...run, height: run.height + 0.6, distance: run.distance + 1, lookAhead: Math.min(run.lookAhead, 4) };
-      this.poses.boss = { ...run, height: run.height + 1.2, distance: run.distance + 2.5, lookAhead: Math.max(run.lookAhead, 10) };
-    }
-    this.target = this.poses[this.mode];
   }
 }

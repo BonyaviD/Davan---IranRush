@@ -7,7 +7,6 @@ import { toFaDigits } from './digits';
 export interface MenuHandlers {
   onPlay: (levelIndex: number) => void;
   onShop: () => void;
-  onCamera: () => void;
   onSound: (on: boolean) => void;
   onTap: () => void;
 }
@@ -103,11 +102,6 @@ export class Menu {
   }
 
   private buildSettings(): void {
-    const camera = el('button', 'btn btn-ghost', 'زاویه‌ی دوربین');
-    camera.addEventListener('click', () => this.tap(() => {
-      this.settingsSheet.hidden = true;
-      this.h.onCamera();
-    }));
     this.soundBtn.addEventListener('click', () => {
       if (!this.progress) return;
       const on = !this.progress.sound;
@@ -117,7 +111,7 @@ export class Menu {
     });
     const close = el('button', 'btn', 'بستن');
     close.addEventListener('click', () => (this.settingsSheet.hidden = true));
-    this.settingsSheet.append(el('h2', 'sheet-title', 'تنظیمات'), this.soundBtn, camera, close);
+    this.settingsSheet.append(el('h2', 'sheet-title', 'تنظیمات'), this.soundBtn, close);
     this.settingsSheet.hidden = true;
   }
 }

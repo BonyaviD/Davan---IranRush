@@ -7,7 +7,7 @@ import { CrowdModel } from '../core/CrowdModel';
 import { isPositiveGate } from '../core/GateLogic';
 import { obstacleHits } from '../core/ObstacleLogic';
 import { clamp, damp, laneIndex } from '../core/Steering';
-import type { CameraPose, LevelData, RunResult, WorldConfig } from '../core/types';
+import type { LevelData, RunResult, WorldConfig } from '../core/types';
 import { Boss } from '../render/Boss';
 import { CameraRig } from '../render/CameraRig';
 import { characterTime } from '../render/characters/build';
@@ -106,14 +106,6 @@ export class Game {
     this.stage.scene.add(this.crowdLabel.sprite, this.popups.group, this.sparks.points);
     this.lastFrame = performance.now();
     requestAnimationFrame(this.frame);
-  }
-
-  setCameraPose(pose: CameraPose): void {
-    this.rig.setRunPose(pose);
-  }
-
-  setAutoZoom(on: boolean): void {
-    this.rig.autoZoom = on;
   }
 
   /** Characters mixed into the player's crowd (rebuilt only when the set changes). */
