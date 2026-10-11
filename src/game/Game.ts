@@ -34,6 +34,9 @@ const MAX_DT = 0.05;
 const LABEL_Y = 2.3;
 const TEAM_MARKER = 0x2f6fd6;
 const ENEMY_MARKER = 0xc0392b;
+/** Draw distance for gates, obstacles and enemy groups (m behind / ahead of the crowd). */
+const CULL_BEHIND = 25;
+const CULL_AHEAD = 170;
 /** Mystery gates reveal their values this close (m). */
 const REVEAL_DISTANCE = 9;
 
@@ -425,10 +428,25 @@ export class Game {
     crowd.centerX = x;
     crowd.centerZ = z;
     crowd.update(dt, this.time);
-    for (const e of this.enemies) if (!e.defeated) e.crowd.update(dt, this.time);
-    for (const o of this.obstacles) o.update(dt, this.time);
+    // Only things near the crowd are drawn and animated: long levels stay cheap on phones.
+    const near = (oz: number) => z - oz > -CULL_BEHIND && z - oz < CULL_AHEAD;
+    for (const e of this.enemies) {
+      const vis = !e.defeated && near(e.crowd.centerZ);
+      e.crowd.group.visible = vis;
+      e.label.sprite.visible = vis;
+      if (vis) e.crowd.update(dt, this.time);
+    }
+    for (const o of this.obstacles) {
+      o.group.visible = near(o.z);
+      if (o.group.visible) o.update(dt, this.time);
+    }
     this.boss?.update(dt);
-    for (const g of this.gates) g.update(dt);
+    for (const g of this.gates) {
+      if (g.passed && !g.group.visible) continue;
+      const vis = near(g.group.position.z);
+      if (!g.passed) g.group.visible = vis;
+      g.update(dt);
+    }
     this.popups.update(dt);
     this.sparks.update(dt);
 

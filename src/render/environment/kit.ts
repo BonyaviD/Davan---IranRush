@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GAME } from '../../config/game.config';
 import type { WorldConfig } from '../../core/types';
-import { GOLD, TURQUOISE, inked, inkMaterial, toon, toonMapped } from '../style/materials';
+import { GOLD, TURQUOISE, inkMaterial, toon, toonMapped } from '../style/materials';
 import { cloudTexture, facadeTexture, tileTexture } from '../style/textures';
 
 /** World-space z range the scenery covers: from behind the camera to past the boss. */
@@ -116,7 +116,7 @@ export function buildStreet(world: WorldConfig, span: Span, root: THREE.Group): 
 }
 
 /** Inked instanced mesh: the body plus an ink shell instance per placement. */
-function inkedInstances(geo: THREE.BufferGeometry, mat: THREE.Material, mats: THREE.Matrix4[], shell = 0.06): THREE.Group {
+export function inkedInstances(geo: THREE.BufferGeometry, mat: THREE.Material, mats: THREE.Matrix4[], shell = 0.06): THREE.Group {
   const g = new THREE.Group();
   const body = new THREE.InstancedMesh(geo, mat, mats.length);
   const ink = new THREE.InstancedMesh(geo.clone().scale(1 + shell, 1 + shell, 1 + shell), inkMaterial, mats.length);
@@ -157,30 +157,43 @@ export function buildTrees(world: WorldConfig, span: Span, root: THREE.Group): v
   root.add(trunkMesh);
 }
 
-/** Continuous facades in a 4-building rhythm, each with a gold cornice and turquoise plinth. */
+/**
+ * Continuous facades in a 4-building rhythm, each with a gold cornice and turquoise plinth.
+ * Instanced per rhythm variant, so a 400 m street costs about a dozen draw calls.
+ */
 export function buildFacades(world: WorldConfig, span: Span, root: THREE.Group, heights = [7, 9.5, 7, 11.5]): void {
   const walls = world.palette.walls;
-  const mats = heights.map((h, k) => toonMapped(facadeTexture(walls[k % walls.length]!, Math.max(1, Math.round(h / 4.5)))));
-  const cornice = new THREE.BoxGeometry(BUILD_D + 0.3, 0.35, BUILD_L);
-  const plinth = new THREE.BoxGeometry(BUILD_D + 0.16, 0.7, BUILD_L);
+  const V = heights.length;
+  const bodies: THREE.Matrix4[][] = heights.map(() => []);
+  const cornices: THREE.Matrix4[] = [];
+  const plinths: THREE.Matrix4[] = [];
   let k = 0;
   for (let z = span.from - BUILD_L / 2; z > span.to; z -= BUILD_L, k++) {
-    const h = heights[k % heights.length]!;
+    const h = heights[k % V]!;
     for (const side of [-1, 1]) {
-      const b = new THREE.Group();
-      const body = inked(new THREE.Mesh(new THREE.BoxGeometry(BUILD_D, h, BUILD_L), mats[k % heights.length]!), 0.008);
-      body.position.y = h / 2;
-      body.castShadow = true;
-      body.receiveShadow = true;
-      const c = new THREE.Mesh(cornice, toon(GOLD));
-      c.position.set(-side * 0.15, h + 0.17, 0);
-      const pl = new THREE.Mesh(plinth, toon(TURQUOISE));
-      pl.position.set(-side * 0.08, 0.35, 0);
-      b.add(body, c, pl);
-      b.position.set(side * (STREET.build + BUILD_D / 2), 0, z);
-      root.add(b);
+      const x = side * (STREET.build + BUILD_D / 2);
+      bodies[k % V]!.push(new THREE.Matrix4().makeScale(BUILD_D, h, BUILD_L).setPosition(x, h / 2, z));
+      cornices.push(new THREE.Matrix4().makeTranslation(x - side * 0.15, h + 0.17, z));
+      plinths.push(new THREE.Matrix4().makeTranslation(x - side * 0.08, 0.35, z));
     }
   }
+  const unit = new THREE.BoxGeometry(1, 1, 1);
+  heights.forEach((h, v) => {
+    const mat = toonMapped(facadeTexture(walls[v % walls.length]!, Math.max(1, Math.round(h / 4.5))));
+    const g = inkedInstances(v === 0 ? unit : unit.clone(), mat, bodies[v]!, 0.012);
+    g.children.forEach((c) => ((c as THREE.Mesh).receiveShadow = true));
+    root.add(g);
+  });
+  root.add(instanced(new THREE.BoxGeometry(BUILD_D + 0.3, 0.35, BUILD_L), toon(GOLD), cornices));
+  root.add(instanced(new THREE.BoxGeometry(BUILD_D + 0.16, 0.7, BUILD_L), toon(TURQUOISE), plinths));
+}
+
+/** Plain instanced mesh from a list of placements. */
+export function instanced(geo: THREE.BufferGeometry, mat: THREE.Material, mats: THREE.Matrix4[]): THREE.InstancedMesh {
+  const m = new THREE.InstancedMesh(geo, mat, Math.max(1, mats.length));
+  mats.forEach((mx, i) => m.setMatrixAt(i, mx));
+  m.count = mats.length;
+  return m;
 }
 
 /** Frees per-level GPU resources; cached shared materials and geometries survive. */

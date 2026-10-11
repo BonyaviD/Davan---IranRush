@@ -43,13 +43,39 @@ export function simulateRun(level: LevelData, choices: readonly (0 | 1)[]): RunO
   return { count, result: 'win' };
 }
 
-/** Every possible lane combination's outcome (levels have few segments). */
-export function allOutcomes(level: LevelData): RunOutcome[] {
-  const n = level.segments.length;
-  const out: RunOutcome[] = [];
-  for (let mask = 0; mask < 1 << n; mask++) {
-    const choices = Array.from({ length: n }, (_, i) => ((mask >> i) & 1) as 0 | 1);
-    out.push(simulateRun(level, choices));
+/**
+ * Lane choices that maximize (best) or minimize (worst) the crowd at every gate. Gates and
+ * fights are monotonic in the crowd size, so greedy-best is the optimal strategy and
+ * greedy-worst the worst one: together they bound every possible run.
+ */
+export function greedyChoices(level: LevelData, mode: 'best' | 'worst'): (0 | 1)[] {
+  const choices: (0 | 1)[] = [];
+  let count = level.startCount;
+  for (const ev of pathEvents(level)) {
+    if (ev.kind === 'gate') {
+      const [a, b] = level.segments[ev.index]!.gates;
+      const ca = applyGate(a, count);
+      const cb = applyGate(b, count);
+      const pickA = mode === 'best' ? ca >= cb : ca <= cb;
+      choices[ev.index] = pickA ? 0 : 1;
+      count = pickA ? ca : cb;
+    } else {
+      const foe = ev.kind === 'enemy' ? level.enemies[ev.index]!.count : level.boss.hp;
+      count = Math.max(0, count - foe);
+    }
   }
-  return out;
+  return choices;
 }
+
+/** Outcome of n random lane choices (seeded), for measuring how forgiving a level is. */
+export function randomWinRate(level: LevelData, n = 400, seed = 1): number {
+  let s = seed;
+  const rand = () => ((s = (s * 1103515245 + 12345) >>> 0) / 4294967296);
+  let wins = 0;
+  for (let k = 0; k < n; k++) {
+    const choices = level.segments.map(() => (rand() < 0.5 ? 0 : 1) as 0 | 1);
+    if (simulateRun(level, choices).result === 'win') wins++;
+  }
+  return wins / n;
+}
+
