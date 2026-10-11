@@ -1,0 +1,458 @@
+<title>دوان، انتخاب زاویه‌ی دوربین</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap">
+<style>
+  /* Layout: full-bleed 3D view, floating title bar on top, camera picker docked at bottom. */
+  :root {
+    --sky: #f3c58f;
+    --ink: #fff7ec;
+    --panel: rgba(24, 18, 14, 0.82);
+    --panel-line: rgba(255, 235, 210, 0.16);
+    --accent: #e9892b;
+    --muted: #c9b8a6;
+    --font: 'Vazirmatn', Tahoma, system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: #1b1410;
+    color: var(--ink);
+    font-family: var(--font);
+    overflow: hidden;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #view { position: fixed; top: 0; left: 0; right: 0; bottom: var(--dock-h, 0px); }
+  #view canvas { display: block; width: 100%; height: 100%; }
+
+  .top {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px;
+    direction: rtl;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    pointer-events: none;
+  }
+  .top h1 { margin: 0; font-size: 20px; font-weight: 900; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
+  .top p { margin: 2px 0 0; font-size: 13px; color: var(--ink); opacity: .85; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+
+  .dock {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
+    direction: rtl;
+    background: var(--panel);
+    border-top: 1px solid var(--panel-line);
+    backdrop-filter: blur(8px);
+    display: grid;
+    gap: 10px;
+  }
+  .presets { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .intro { font: inherit; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--panel-line); border-radius: 999px; padding: 6px 14px; cursor: pointer; pointer-events: auto; white-space: nowrap; }
+  .preset {
+    font: inherit;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--panel-line);
+    border-radius: 12px;
+    padding: 8px 4px;
+    cursor: pointer;
+    display: grid;
+    gap: 2px;
+    text-align: center;
+    min-width: 0;
+  }
+  .preset b { font-size: 22px; font-weight: 900; line-height: 1.1; }
+  .preset span { font-size: 11px; color: var(--muted); line-height: 1.3; }
+  .preset[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+  .preset[aria-pressed="true"] span { color: var(--ink); }
+  .preset:focus-visible, summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  details { font-size: 13px; }
+  summary { cursor: pointer; color: var(--muted); padding: 2px 0; }
+  .sliders { display: grid; gap: 6px; margin-top: 8px; }
+  .row { display: grid; grid-template-columns: 70px minmax(0, 1fr) 44px; align-items: center; gap: 8px; }
+  .row output { font-variant-numeric: tabular-nums; text-align: left; direction: ltr; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .readout {
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  #error { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; direction: rtl; }
+  @media (max-width: 380px) { .preset span { font-size: 10px; } }
+</style>
+
+<div id="view"></div>
+
+<div class="top">
+  <div>
+    <h1>کدوم زاویه؟</h1>
+    <p>انگشت یا موس رو بکش تا گروه چپ و راست بره</p>
+  </div>
+  <button class="intro" id="intro">▶ شروع مرحله</button>
+</div>
+
+<div class="dock">
+  <div class="presets" role="group" aria-label="زاویه‌های آماده">
+    <button class="preset" id="p-a" data-preset="a" aria-pressed="false"><b>الف</b><span>نزدیک و پایین</span></button>
+    <button class="preset" id="p-b" data-preset="b" aria-pressed="false"><b>ب</b><span>کلاسیک Count Masters</span></button>
+    <button class="preset" id="p-c" data-preset="c" aria-pressed="false"><b>ج</b><span>بالاتر و بازتر</span></button>
+    <button class="preset" id="p-d" data-preset="d" aria-pressed="false"><b>د</b><span>سینمایی، رو به برج</span></button>
+    <button class="preset" id="p-e" data-preset="e" aria-pressed="true"><b>هـ</b><span>الف پایین‌تر + برج</span></button>
+  </div>
+  <details>
+    <summary>تنظیم دستی</summary>
+    <div class="sliders">
+      <label class="row"><span>ارتفاع</span><input id="s-h" type="range" min="1.5" max="25" step="0.1"><output id="o-h"></output></label>
+      <label class="row"><span>فاصله</span><input id="s-d" type="range" min="3" max="25" step="0.1"><output id="o-d"></output></label>
+      <label class="row"><span>نگاه جلو</span><input id="s-l" type="range" min="0" max="40" step="0.5"><output id="o-l"></output></label>
+      <label class="row"><span>میدان دید</span><input id="s-f" type="range" min="30" max="80" step="1"><output id="o-f"></output></label>
+    </div>
+  </details>
+  <div class="readout" id="readout"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  if (!window.THREE) {
+    document.body.insertAdjacentHTML('beforeend', '<div id="error">کتابخانه‌ی سه‌بعدی بارگذاری نشد. صفحه رو دوباره باز کن.</div>');
+    return;
+  }
+
+  const FA = '۰۱۲۳۴۵۶۷۸۹';
+  const fa = (s) => String(s).replace(/[0-9]/g, (d) => FA[d]);
+
+  // Camera presets: height, distance behind crowd, look-ahead point, field of view.
+  const PRESETS = {
+    a: { h: 4, d: 8, l: 8, f: 60 },
+    b: { h: 10, d: 13, l: 4, f: 55 },
+    c: { h: 19, d: 11, l: 2, f: 50 },
+    d: { h: 2.6, d: 7.5, l: 30, f: 62 },
+    e: { h: 3, d: 7.5, l: 16, f: 62 },
+  };
+  const cam = { ...PRESETS.d };
+  const target = { ...PRESETS.d };
+
+  const ROAD_W = 9;
+  const LOOP = 160;
+  const SPEED = 9;
+
+  const view = document.getElementById('view');
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  view.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const SKY = 0xf3c58f;
+  scene.background = new THREE.Color(SKY);
+  scene.fog = new THREE.Fog(SKY, 90, 650);
+
+  const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 600);
+
+  scene.add(new THREE.HemisphereLight(0xfff1dc, 0x6b5440, 0.75));
+  const sun = new THREE.DirectionalLight(0xffe2b8, 0.9);
+  sun.position.set(-12, 25, 10);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 70 });
+  scene.add(sun, sun.target);
+
+  const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
+
+  // ---------- Static ground ----------
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), mat(0xcfb08a));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.02;
+  scene.add(ground);
+
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W, 600), mat(0x45464c));
+  road.rotation.x = -Math.PI / 2;
+  road.receiveShadow = true;
+  scene.add(road);
+
+  for (const side of [-1, 1]) {
+    const walk = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.18, 600), mat(0xb9a58c));
+    walk.position.set(side * (ROAD_W / 2 + 1.2), 0.09, 0);
+    walk.receiveShadow = true;
+    scene.add(walk);
+    const jube = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.2, 600), mat(0x5d7f8a));
+    jube.position.set(side * (ROAD_W / 2 + 0.25), 0.02, 0);
+    scene.add(jube);
+  }
+
+  // ---------- Scrolling props (wrap around LOOP) ----------
+  const scrollers = [];
+  const addScroller = (obj, z) => { obj.position.z = z; scene.add(obj); scrollers.push(obj); return obj; };
+
+  // Lane dashes
+  const dashGeo = new THREE.BoxGeometry(0.18, 0.02, 2.2);
+  const dashMat = new THREE.MeshBasicMaterial({ color: 0xf2f2f2 });
+  for (let z = 0; z > -LOOP; z -= 6) addScroller(new THREE.Mesh(dashGeo, dashMat), z);
+
+  // Plane trees (chenar) along the jube
+  const trunkGeo = new THREE.CylinderGeometry(0.12, 0.18, 1.6, 6);
+  const crownGeo = new THREE.IcosahedronGeometry(1.2, 0);
+  const trunkMat = mat(0x6e4a2f);
+  const crownMats = [mat(0x4f8a3c), mat(0x5c9945), mat(0x46803a)];
+  let ti = 0;
+  for (let z = -2; z > -LOOP; z -= 7) {
+    for (const side of [-1, 1]) {
+      const tree = new THREE.Group();
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+      trunk.position.y = 0.8;
+      const crown = new THREE.Mesh(crownGeo, crownMats[ti++ % 3]);
+      crown.position.y = 2.3;
+      crown.scale.set(1, 1.15, 1);
+      trunk.castShadow = crown.castShadow = true;
+      tree.add(trunk, crown);
+      tree.position.x = side * (ROAD_W / 2 + 0.9);
+      addScroller(tree, z + (side > 0 ? 3 : 0));
+    }
+  }
+
+  // Low-rise Tehran blocks with window bands
+  const facade = [0xd8c3a0, 0xc7a27c, 0xe2d6c2, 0xb88a64, 0xcdb9a0];
+  const winMat = mat(0x5a6f80);
+  let bi = 0;
+  for (let z = -4; z > -LOOP; z -= 11) {
+    for (const side of [-1, 1]) {
+      const h = 5 + ((bi * 37) % 9);
+      const b = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(6, h, 9), mat(facade[bi++ % facade.length]));
+      body.position.y = h / 2;
+      body.castShadow = true;
+      b.add(body);
+      for (let y = 2; y < h - 0.5; y += 2.2) {
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.9, 7.6), winMat);
+        band.position.set(-side * 3.01, y, 0);
+        b.add(band);
+      }
+      b.position.x = side * (ROAD_W / 2 + 2.4 + 3);
+      addScroller(b, z);
+    }
+  }
+
+  // Gates: two translucent panels with numbers drawn into canvas textures
+  function labelTexture(text, color) {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 128;
+    const g = c.getContext('2d');
+    g.direction = 'ltr';
+    g.fillStyle = color;
+    g.fillRect(0, 0, 256, 128);
+    g.font = '900 78px Vazirmatn, Tahoma, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.lineWidth = 10;
+    g.strokeStyle = 'rgba(0,0,0,.45)';
+    g.strokeText(text, 128, 70);
+    g.fillStyle = '#fff';
+    g.fillText(text, 128, 70);
+    const t = new THREE.CanvasTexture(c);
+    t.anisotropy = 4;
+    return t;
+  }
+  const GATE_SETS = [['+۱۰', '−۵'], ['×۲', '+۵'], ['−۱۰', '+۲۰'], ['÷۲', '×۲']];
+  const POS = 'rgba(40,170,95,0.78)', NEG = 'rgba(205,60,55,0.78)';
+  function buildGates() {
+    GATE_SETS.forEach((pair, i) => {
+      const gate = new THREE.Group();
+      pair.forEach((txt, side) => {
+        const good = txt[0] === '+' || txt[0] === '×';
+        const m = new THREE.Mesh(
+          new THREE.PlaneGeometry(ROAD_W / 2 - 0.2, 2.4),
+          new THREE.MeshBasicMaterial({ map: labelTexture(txt, good ? POS : NEG), transparent: true, side: THREE.DoubleSide })
+        );
+        m.position.set((side === 0 ? -1 : 1) * (ROAD_W / 4), 1.6, 0);
+        gate.add(m);
+      });
+      const postGeo = new THREE.BoxGeometry(0.25, 3.2, 0.25);
+      for (const x of [-ROAD_W / 2, 0, ROAD_W / 2]) {
+        const post = new THREE.Mesh(postGeo, mat(0xf4efe6));
+        post.position.set(x, 1.6, 0);
+        post.castShadow = true;
+        gate.add(post);
+      }
+      addScroller(gate, -25 - i * 38);
+    });
+  }
+
+  // ---------- Landmarks (far, static) ----------
+  // Milad tower: tapering shaft, layered pod, antenna
+  const milad = new THREE.Group();
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 3.2, 70, 8), mat(0xd9d4cc));
+  shaft.position.y = 35;
+  milad.add(shaft);
+  [[5.2, 2.2, 68], [6.2, 3, 71.5], [5.6, 2.4, 75], [3.6, 1.6, 77.5]].forEach(([r, h, y]) => {
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.92, h, 16), mat(0x8d9aa6));
+    ring.position.y = y;
+    milad.add(ring);
+  });
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.7, 34, 6), mat(0xe8e3db));
+  mast.position.y = 96;
+  milad.add(mast);
+  milad.position.set(9, 0, -175);
+  scene.add(milad);
+
+  // Alborz range with snowy caps
+  const rock = mat(0x9b8670), snow = mat(0xf5f1ea);
+  for (let i = 0; i < 14; i++) {
+    const h = 45 + ((i * 53) % 40);
+    const r = 40 + ((i * 29) % 25);
+    const x = -260 + i * 40;
+    const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 5), rock);
+    m.position.set(x, h / 2 - 2, -330 - ((i * 17) % 50));
+    scene.add(m);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(r * 0.32, h * 0.32, 5), snow);
+    cap.position.set(x, h - 2 - h * 0.16, m.position.z);
+    scene.add(cap);
+  }
+
+  // ---------- Crowds (instanced) ----------
+  const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+  function makeCrowd(n, color, spacing) {
+    const bodyGeo = new THREE.CylinderGeometry(0.17, 0.22, 0.75, 7);
+    const headGeo = new THREE.SphereGeometry(0.19, 8, 6);
+    const m = mat(color);
+    const bodies = new THREE.InstancedMesh(bodyGeo, m, n);
+    const heads = new THREE.InstancedMesh(headGeo, m, n);
+    bodies.castShadow = heads.castShadow = true;
+    const off = [];
+    for (let i = 0; i < n; i++) {
+      const r = spacing * Math.sqrt(i), a = i * GOLDEN;
+      off.push([Math.cos(a) * r, Math.sin(a) * r]);
+    }
+    scene.add(bodies, heads);
+    return { bodies, heads, off, n, x: 0, z: 0 };
+  }
+  const tmp = new THREE.Object3D();
+  function poseCrowd(c, t, running) {
+    for (let i = 0; i < c.n; i++) {
+      const [ox, oz] = c.off[i];
+      const bob = running ? Math.abs(Math.sin(t * 11 + i * 1.7)) * 0.12 : 0;
+      tmp.position.set(c.x + ox, 0.38 + bob, c.z + oz);
+      tmp.rotation.set(running ? Math.sin(t * 11 + i) * 0.08 : 0, 0, 0);
+      tmp.updateMatrix();
+      c.bodies.setMatrixAt(i, tmp.matrix);
+      tmp.position.y = 0.95 + bob;
+      tmp.updateMatrix();
+      c.heads.setMatrixAt(i, tmp.matrix);
+    }
+    c.bodies.instanceMatrix.needsUpdate = true;
+    c.heads.instanceMatrix.needsUpdate = true;
+  }
+  const player = makeCrowd(50, 0x2f7de1, 0.36);
+  const enemy = makeCrowd(40, 0xc8372d, 0.36);
+  enemy.z = -150;
+
+  // ---------- Input ----------
+  let steer = 0, steerTarget = 0, dragX = null, dragStart = 0;
+  const canvas = renderer.domElement;
+  canvas.addEventListener('pointerdown', (e) => { dragX = e.clientX; dragStart = steerTarget; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', (e) => {
+    if (dragX === null) return;
+    const span = Math.min(window.innerWidth, 500) / 2;
+    steerTarget = Math.max(-1, Math.min(1, dragStart + (e.clientX - dragX) / span));
+  });
+  const endDrag = () => { dragX = null; };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+
+  // ---------- Camera UI ----------
+  const sliders = { h: 's-h', d: 's-d', l: 's-l', f: 's-f' };
+  const outputs = { h: 'o-h', d: 'o-d', l: 'o-l', f: 'o-f' };
+  function syncSliders() {
+    for (const k in sliders) {
+      document.getElementById(sliders[k]).value = target[k];
+      document.getElementById(outputs[k]).textContent = fa(Number(target[k]).toFixed(k === 'f' ? 0 : 1));
+    }
+    const pitch = Math.atan2(target.h, target.d + target.l) * 180 / Math.PI;
+    document.getElementById('readout').textContent =
+      `ارتفاع ${fa(target.h.toFixed(1))} · فاصله ${fa(target.d.toFixed(1))} · زاویه‌ی رو به پایین ${fa(Math.round(pitch))}° · میدان دید ${fa(target.f)}°`;
+  }
+  document.querySelectorAll('.preset').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      Object.assign(target, PRESETS[btn.dataset.preset]);
+      document.querySelectorAll('.preset').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      syncSliders();
+    });
+  });
+  for (const k in sliders) {
+    document.getElementById(sliders[k]).addEventListener('input', (e) => {
+      target[k] = Number(e.target.value);
+      document.querySelectorAll('.preset').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+      syncSliders();
+    });
+  }
+  // Level intro: open on the cinematic tower shot, then glide into the run camera.
+  let introTimer = 0;
+  function playIntro() {
+    clearTimeout(introTimer);
+    Object.assign(cam, PRESETS.d);
+    Object.assign(target, PRESETS.d);
+    syncSliders();
+    introTimer = setTimeout(() => document.getElementById('p-e').click(), 2200);
+  }
+  document.getElementById('intro').addEventListener('click', playIntro);
+  syncSliders();
+
+  // ---------- Loop ----------
+  function resize() {
+    document.documentElement.style.setProperty('--dock-h', document.querySelector('.dock').offsetHeight + 'px');
+    const w = view.clientWidth, h = view.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  document.querySelector('details').addEventListener('toggle', resize);
+  resize();
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let last = performance.now(), t = 0;
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    t += dt;
+    const k = 1 - Math.exp(-6 * dt);
+
+    steer += (steerTarget - steer) * (1 - Math.exp(-10 * dt));
+    player.x = steer * (ROAD_W / 2 - 1.8);
+
+    const move = reduceMotion ? SPEED * 0.4 * dt : SPEED * dt;
+    for (const o of scrollers) {
+      o.position.z += move;
+      if (o.position.z > 14) o.position.z -= LOOP;
+    }
+    enemy.z += move;
+    if (enemy.z > 14) enemy.z -= LOOP;
+
+    poseCrowd(player, t, true);
+    poseCrowd(enemy, t, false);
+
+    for (const key of ['h', 'd', 'l', 'f']) cam[key] += (target[key] - cam[key]) * k;
+    const cx = player.x * 0.6;
+    camera.position.set(cx, cam.h, cam.d);
+    camera.lookAt(cx * 0.5, 0.8, -cam.l);
+    if (Math.abs(camera.fov - cam.f) > 0.01) { camera.fov = cam.f; camera.updateProjectionMatrix(); }
+
+    sun.position.set(player.x - 12, 25, 10);
+    sun.target.position.set(player.x, 0, -4);
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  const start = () => { buildGates(); playIntro(); requestAnimationFrame(frame); };
+  (document.fonts ? document.fonts.load('900 78px Vazirmatn').catch(() => {}) : Promise.resolve()).then(start, start);
+})();
+</script>

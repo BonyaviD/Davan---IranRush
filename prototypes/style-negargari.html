@@ -1,0 +1,923 @@
+<title>دوان، سبک نگارگری</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap">
+<style>
+  /* Layout: full-bleed 3D scene, title floating top-right, two pill controls top-left. Single dark-gold look. */
+  :root {
+    --ink: #fff8ea;
+    --gold: #e2b04a;
+    --panel: rgba(30, 22, 40, 0.62);
+    --line: rgba(255, 230, 180, 0.35);
+    --font: 'Vazirmatn', Tahoma, system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: #1d2a52;
+    color: var(--ink);
+    font-family: var(--font);
+    overflow: hidden;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #view { position: fixed; inset: 0; }
+  #view canvas { display: block; width: 100%; height: 100%; }
+  .top {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 0;
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    direction: rtl;
+    pointer-events: none;
+  }
+  .title { text-align: right; min-width: 0; }
+  .title h1 { margin: 0; font-size: 20px; font-weight: 900; text-shadow: 0 2px 8px rgba(40,20,0,.55); }
+  .title p { margin: 2px 0 0; font-size: 13px; text-shadow: 0 1px 6px rgba(40,20,0,.7); }
+  .controls { display: grid; gap: 8px; justify-items: start; pointer-events: auto; }
+  .pill {
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    backdrop-filter: blur(6px);
+  }
+  .pill[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+  .pill:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  #shop {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+    display: flex; justify-content: center; direction: rtl;
+  }
+  #shop[hidden] { display: none; }
+  .shop-card {
+    display: grid; grid-template-columns: 52px minmax(0, 1fr) 52px; align-items: center; gap: 8px;
+    width: min(100%, 420px); padding: 10px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 20px; backdrop-filter: blur(6px);
+  }
+  .shop-info { display: grid; gap: 2px; text-align: center; min-width: 0; }
+  .shop-info b { font-size: 20px; font-weight: 900; color: var(--gold); }
+  .shop-info span { font-size: 13px; opacity: .8; }
+  .shop-arrow {
+    width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--line);
+    background: transparent; color: var(--ink); font: inherit; font-size: 30px; line-height: 1; cursor: pointer;
+  }
+  .shop-arrow:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  #error { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; direction: rtl; }
+</style>
+
+<div id="view"></div>
+<div id="shop" hidden>
+  <div class="shop-card">
+    <button class="shop-arrow" id="shop-next" aria-label="شخصیت بعدی">›</button>
+    <div class="shop-info"><b id="shop-name"></b><span id="shop-count"></span></div>
+    <button class="shop-arrow" id="shop-prev" aria-label="شخصیت قبلی">‹</button>
+  </div>
+</div>
+<div class="top">
+  <div class="title">
+    <h1>سبک نگارگری</h1>
+    <p>انگشت رو بکش</p>
+  </div>
+  <div class="controls">
+    <button class="pill" id="replay">▶ شروع دوباره</button>
+    <button class="pill" id="ink" aria-pressed="true">قلم‌گیری: روشن</button>
+    <button class="pill" id="gallery" aria-pressed="false">گالری شخصیت‌ها</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  if (!window.THREE) {
+    document.body.insertAdjacentHTML('beforeend', '<div id="error">کتابخانه‌ی سه‌بعدی بارگذاری نشد. صفحه رو دوباره باز کن.</div>');
+    return;
+  }
+
+  // ---------- Palette (miniature painting) ----------
+  const C = {
+    lapis: 0x23408e, horizon: 0xf7dfa0, gold: 0xe2b04a, ink: 0x3b2416,
+    turquoise: 0x1fa3a8, cream: 0xf3e3c3, road: 0x9b8fa6, walk: 0xe9dcc0,
+    cypress: 0x2e6a45, blossom: 0xf3a9bd, rockPink: 0xe7a39a, rockLilac: 0xb99ac7, rockSand: 0xefc193,
+    team: 0x2f6fd6, enemy: 0xc0392b, skin: 0xeac39c,
+  };
+  const ROAD_W = 9, LOOP = 160, SPEED = 9;
+  const POSES = {
+    intro: { h: 2.6, d: 7.5, l: 30, f: 62 },
+    run: { h: 4, d: 8, l: 8, f: 60 },
+  };
+
+  const view = document.getElementById('view');
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  view.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(C.horizon, 90, 900);
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 900);
+
+  scene.add(new THREE.HemisphereLight(0xfff4dc, 0xb48a6a, 0.75));
+  const sun = new THREE.DirectionalLight(0xfff0d0, 0.7);
+  sun.position.set(-10, 22, 12);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12, near: 1, far: 60 });
+  scene.add(sun, sun.target);
+
+  // Three-step toon ramp gives the flat, painted shading of a miniature.
+  const ramp = new THREE.DataTexture(new Uint8Array([120, 190, 255]), 3, 1, THREE.LuminanceFormat);
+  ramp.minFilter = ramp.magFilter = THREE.NearestFilter;
+  ramp.needsUpdate = true;
+  const toonCache = new Map();
+  const toon = (color, map) => {
+    if (map) return new THREE.MeshToonMaterial({ color, map, gradientMap: ramp });
+    if (!toonCache.has(color)) toonCache.set(color, new THREE.MeshToonMaterial({ color, gradientMap: ramp }));
+    return toonCache.get(color);
+  };
+
+  // Ink outlines: an inflated back-face shell behind each object (the "qalam-giri" line).
+  const inkMat = new THREE.MeshBasicMaterial({ color: C.ink, side: THREE.BackSide });
+  const inkObjects = [];
+  function inked(mesh, t = 0.05) {
+    const shell = new THREE.Mesh(mesh.geometry, inkMat);
+    shell.scale.setScalar(1 + t);
+    mesh.add(shell);
+    inkObjects.push(shell);
+    return mesh;
+  }
+
+  // ---------- Canvas-painted textures ----------
+  function canvasTex(w, h, draw, repeat) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    draw(c.getContext('2d'), w, h);
+    const t = new THREE.CanvasTexture(c);
+    if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]); }
+    t.anisotropy = 4;
+    return t;
+  }
+  const hex = (n) => '#' + n.toString(16).padStart(6, '0');
+
+  function star8(g, cx, cy, r, fill, stroke) {
+    g.beginPath();
+    for (let i = 0; i < 16; i++) {
+      const a = (i * Math.PI) / 8;
+      const rr = i % 2 ? r * 0.55 : r;
+      g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+    }
+    g.closePath();
+    g.fillStyle = fill; g.fill();
+    if (stroke) { g.strokeStyle = stroke; g.lineWidth = 2; g.stroke(); }
+  }
+
+  // Sidewalk: large calm tiles, one eight-point star each, soft grout lines.
+  const tileTex = canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = '#f4e6c8'; g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#d9c59c'; g.lineWidth = 6; g.strokeRect(3, 3, w - 6, h - 6);
+    star8(g, 128, 128, 84, hex(C.turquoise));
+    star8(g, 128, 128, 70, '#f4e6c8');
+    star8(g, 128, 128, 52, hex(C.turquoise));
+    star8(g, 128, 128, 22, hex(C.gold));
+  }, [2, 8]);
+
+  // Facade: cream wall, lapis pointed-arch windows framed in gold, turquoise tile frieze.
+  function arch(g, x, y, w, h) {
+    g.beginPath();
+    g.moveTo(x, y + h);
+    g.lineTo(x, y + h * 0.42);
+    g.quadraticCurveTo(x, y + h * 0.08, x + w / 2, y);
+    g.quadraticCurveTo(x + w, y + h * 0.08, x + w, y + h * 0.42);
+    g.lineTo(x + w, y + h);
+    g.closePath();
+  }
+  function facadeTex(wall) {
+    return canvasTex(256, 256, (g, w, h) => {
+      g.fillStyle = hex(wall); g.fillRect(0, 0, w, h);
+      g.fillStyle = hex(C.turquoise); g.fillRect(0, 0, w, 34);
+      for (let x = 16; x < w; x += 32) star8(g, x, 17, 11, hex(C.gold));
+      g.fillStyle = hex(C.gold); g.fillRect(0, 34, w, 4);
+      for (const x of [28, 148]) {
+        arch(g, x, 70, 80, 150);
+        g.fillStyle = hex(C.gold); g.fill();
+        arch(g, x + 7, 78, 66, 142);
+        g.fillStyle = hex(C.lapis); g.fill();
+        g.strokeStyle = hex(C.ink); g.lineWidth = 3; g.stroke();
+      }
+    }, [1, 1]);
+  }
+
+  // Gate panel shaped as an iwan arch with a number.
+  function gateTex(text, good) {
+    return canvasTex(256, 192, (g, w, h) => {
+      arch(g, 10, 6, w - 20, h - 12);
+      g.fillStyle = hex(C.gold); g.fill();
+      arch(g, 22, 18, w - 44, h - 24);
+      g.fillStyle = good ? 'rgba(35,150,110,0.88)' : 'rgba(190,55,50,0.88)';
+      g.fill();
+      g.strokeStyle = hex(C.ink); g.lineWidth = 4; g.stroke();
+      g.direction = 'ltr';
+      g.font = '900 76px Vazirmatn, Tahoma, sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.lineWidth = 10; g.lineJoin = 'round'; g.strokeStyle = hex(C.ink);
+      g.strokeText(text, w / 2, h * 0.62);
+      g.fillStyle = '#fff8ea'; g.fillText(text, w / 2, h * 0.62);
+    });
+  }
+
+  // Curling "Chinese cloud" band, a classic miniature sky motif.
+  const cloudTex = canvasTex(256, 128, (g) => {
+    g.lineWidth = 5; g.strokeStyle = hex(C.gold); g.fillStyle = '#fffaf0';
+    const blobs = [[60, 80, 30], [100, 60, 36], [148, 64, 34], [190, 82, 28], [125, 88, 30]];
+    for (const [x, y, r] of blobs) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+    for (const [x, y, r] of blobs) { g.beginPath(); g.arc(x, y, r, Math.PI * 1.05, Math.PI * 1.95); g.stroke(); }
+    g.beginPath();
+    for (let a = 0; a < Math.PI * 3.2; a += 0.15) g.lineTo(128 + Math.cos(a) * a * 3.4, 74 + Math.sin(a) * a * 3.4);
+    g.stroke();
+  });
+
+  // ---------- Sky dome: gold at the horizon fading to lapis ----------
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(800, 24, 12),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false,
+      uniforms: { top: { value: new THREE.Color(C.lapis) }, bottom: { value: new THREE.Color(C.horizon) } },
+      vertexShader: 'varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying float vY; void main(){ float t = smoothstep(0.0, 0.45, vY); gl_FragColor = vec4(mix(bottom, top, t), 1.0); }',
+    })
+  );
+  scene.add(sky);
+
+  for (let i = 0; i < 7; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, fog: false, transparent: true }));
+    s.scale.set(70, 35, 1);
+    s.position.set(-180 + i * 62, 95 + ((i * 37) % 50), -420 - ((i * 53) % 120));
+    scene.add(s);
+  }
+
+  // ---------- Street cross-section (mirrored, like a Persian garden axis) ----------
+  // road | gold curb | jube water | tree strip | tiled sidewalk | continuous facades
+  const HALF = ROAD_W / 2;
+  const X = { curb: HALF, jube: HALF + 0.25, strip: HALF + 0.7, walk: HALF + 2.1, build: HALF + 4.5 };
+  const BUILD_D = 6;
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), toon(0xd9c99a));
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -0.03;
+  scene.add(ground);
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W, 900), toon(C.road));
+  road.rotation.x = -Math.PI / 2; road.receiveShadow = true;
+  scene.add(road);
+  const strip = (x0, x1, y, color, map) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y, 900), toon(color, map));
+    m.receiveShadow = true;
+    return m;
+  };
+  for (const side of [-1, 1]) {
+    const parts = [
+      [X.curb, X.jube, 0.24, C.gold],
+      [X.jube, X.strip, 0.06, C.turquoise],
+      [X.strip, X.walk, 0.22, 0x86b25c],
+    ];
+    for (const [x0, x1, h, col, map] of parts) {
+      const m = strip(x0, x1, h, col, map);
+      m.position.set(side * (x0 + x1) / 2, h / 2, 0);
+      scene.add(m);
+    }
+  }
+
+  // ---------- Scrolling props (all spacings divide LOOP so the street tiles seamlessly) ----------
+  const scrollers = [];
+  const addScroller = (o, z) => { o.position.z = z; scene.add(o); scrollers.push(o); return o; };
+
+  const dashGeo = new THREE.BoxGeometry(0.2, 0.02, 1.6);
+  for (let z = 0; z > -LOOP; z -= 5) addScroller(new THREE.Mesh(dashGeo, toon(C.gold)), z);
+
+  // Cypress (sarv) alternating with blossom trees, mirrored on both sides.
+  const pts = [];
+  for (let i = 0; i <= 14; i++) {
+    const t = i / 14;
+    pts.push(new THREE.Vector2(Math.sin(Math.PI * Math.pow(t, 0.7)) * 0.7 * (1 - t * 0.35), t * 5.2));
+  }
+  const cypressGeo = new THREE.LatheGeometry(pts, 10);
+  const blossomGeo = new THREE.IcosahedronGeometry(1.15, 1);
+  const trunkGeo = new THREE.CylinderGeometry(0.12, 0.18, 1.5, 6);
+  const treeX = (X.strip + X.walk) / 2;
+  let ti = 0;
+  for (let z = -2.5; z > -LOOP; z -= 5, ti++) {
+    for (const side of [-1, 1]) {
+      const tree = new THREE.Group();
+      if (ti % 2 === 0) {
+        const c = inked(new THREE.Mesh(cypressGeo, toon(C.cypress)), 0.06);
+        c.position.y = 0.2; c.castShadow = true;
+        tree.add(c);
+      } else {
+        const trunk = new THREE.Mesh(trunkGeo, toon(0x7a4a2c));
+        trunk.position.y = 0.95;
+        const crown = inked(new THREE.Mesh(blossomGeo, toon(C.blossom)), 0.06);
+        crown.position.y = 2.4; crown.scale.set(1, 0.9, 1); crown.castShadow = true;
+        tree.add(trunk, crown);
+      }
+      tree.position.x = side * treeX;
+      addScroller(tree, z);
+    }
+  }
+
+  // Sidewalk scrolls with the street in 10 m chunks (8 tiles long), edged with a gold kerb line.
+  const WALK_L = 10;
+  const walkGeo = new THREE.BoxGeometry(X.build - X.walk, 0.2, WALK_L);
+  const walkMat = toon(0xffffff, tileTex);
+  const edgeGeo = new THREE.BoxGeometry(0.12, 0.26, WALK_L);
+  for (let z = -WALK_L / 2; z > -LOOP; z -= WALK_L) {
+    for (const side of [-1, 1]) {
+      const chunk = new THREE.Group();
+      const walk = new THREE.Mesh(walkGeo, walkMat);
+      walk.position.y = 0.1; walk.receiveShadow = true;
+      const edge = new THREE.Mesh(edgeGeo, toon(C.gold));
+      edge.position.set(-side * ((X.build - X.walk) / 2 - 0.06), 0.13, 0);
+      chunk.add(walk, edge);
+      chunk.position.x = side * (X.walk + X.build) / 2;
+      addScroller(chunk, z);
+    }
+  }
+
+  // Continuous facades: a repeating 4-building rhythm, mirrored, each topped by a gold cornice.
+  const RHYTHM = [[0xf3e3c3, 7], [0xeed2b0, 9.5], [0xf6e8d2, 7], [0xe8c9a4, 11.5]];
+  const facadeMats = RHYTHM.map(([w, h]) => {
+    const tex = facadeTex(w);
+    tex.repeat.set(2, Math.max(1, Math.round(h / 4.5)));
+    return toon(0xffffff, tex);
+  });
+  const BUILD_L = 10;
+  const corniceGeo = new THREE.BoxGeometry(BUILD_D + 0.3, 0.35, BUILD_L);
+  const plinthGeo = new THREE.BoxGeometry(BUILD_D + 0.16, 0.7, BUILD_L);
+  let bi = 0;
+  for (let z = -BUILD_L / 2; z > -LOOP; z -= BUILD_L, bi++) {
+    const [, h] = RHYTHM[bi % 4];
+    for (const side of [-1, 1]) {
+      const b = new THREE.Group();
+      const body = inked(new THREE.Mesh(new THREE.BoxGeometry(BUILD_D, h, BUILD_L), facadeMats[bi % 4]), 0.008);
+      body.position.y = h / 2; body.castShadow = true; body.receiveShadow = true;
+      const cornice = new THREE.Mesh(corniceGeo, toon(C.gold));
+      cornice.position.set(-side * 0.15, h + 0.17, 0);
+      const plinth = new THREE.Mesh(plinthGeo, toon(C.turquoise));
+      plinth.position.set(-side * 0.08, 0.35, 0);
+      b.add(body, cornice, plinth);
+      b.position.x = side * (X.build + BUILD_D / 2);
+      addScroller(b, z);
+    }
+  }
+
+  // Iwan gates
+  const GATE_SETS = [['+۱۰', '−۵'], ['×۲', '+۵'], ['−۱۰', '+۲۰'], ['÷۲', '×۲']];
+  const postGeo = new THREE.CylinderGeometry(0.16, 0.2, 3.6, 8);
+  const capGeo = new THREE.SphereGeometry(0.28, 10, 8);
+  function buildGates() {
+    GATE_SETS.forEach((pair, i) => {
+      const gate = new THREE.Group();
+      pair.forEach((txt, side) => {
+        const good = txt[0] === '+' || txt[0] === '×';
+        const m = new THREE.Mesh(
+          new THREE.PlaneGeometry(ROAD_W / 2 - 0.3, 3.1),
+          new THREE.MeshBasicMaterial({ map: gateTex(txt, good), transparent: true, side: THREE.DoubleSide, depthWrite: false })
+        );
+        m.position.set((side === 0 ? -1 : 1) * (ROAD_W / 4), 1.8, 0);
+        gate.add(m);
+      });
+      for (const x of [-ROAD_W / 2, 0, ROAD_W / 2]) {
+        const post = inked(new THREE.Mesh(postGeo, toon(C.gold)), 0.08);
+        post.position.set(x, 1.8, 0); post.castShadow = true;
+        const cap = inked(new THREE.Mesh(capGeo, toon(C.turquoise)), 0.1);
+        cap.position.set(x, 3.75, 0);
+        gate.add(post, cap);
+      }
+      addScroller(gate, -25 - i * 38);
+    });
+  }
+
+  // ---------- Far landmarks ----------
+  // Milad tower in painted colors
+  const milad = new THREE.Group();
+  const shaft = inked(new THREE.Mesh(new THREE.CylinderGeometry(1.1, 3.2, 70, 10), toon(C.cream)), 0.02);
+  shaft.position.y = 35;
+  milad.add(shaft);
+  [[5.2, 2.2, 68, C.turquoise], [6.2, 3, 71.5, C.gold], [5.6, 2.4, 75, C.turquoise], [3.6, 1.6, 77.5, C.gold]].forEach(([r, h, y, col]) => {
+    const ring = inked(new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.92, h, 18), toon(col)), 0.04);
+    ring.position.y = y;
+    milad.add(ring);
+  });
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.7, 34, 6), toon(C.cream));
+  mast.position.y = 96;
+  milad.add(mast);
+  milad.position.set(9, 0, -175);
+  scene.add(milad);
+
+  // Mountains: three continuous painted ridges, layered like paper cut-outs (back lilac,
+  // middle pink, front sand). Each ridge is one silhouette with rounded lobes, and a darker
+  // copy just above and behind it draws the ink line along the crest.
+  function ridge(seed, baseH, amp, color, z) {
+    const W = 1100, step = 3;
+    const shape = new THREE.Shape();
+    shape.moveTo(-W / 2, -30);
+    for (let x = -W / 2; x <= W / 2; x += step) {
+      const y = baseH + amp * (
+        0.5 * Math.sin(x * 0.016 + seed) +
+        0.3 * Math.sin(x * 0.037 + seed * 2.1) +
+        0.2 * Math.abs(Math.sin(x * 0.085 + seed * 3.7))
+      );
+      shape.lineTo(x, y);
+    }
+    shape.lineTo(W / 2, -30);
+    shape.closePath();
+    const geo = new THREE.ShapeGeometry(shape);
+    const body = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color }));
+    body.position.z = z;
+    const line = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: C.ink }));
+    line.position.set(0, 1.6, z - 0.5);
+    inkObjects.push(line);
+    scene.add(body, line);
+  }
+  ridge(1.3, 78, 38, C.rockLilac, -420);
+  ridge(4.1, 50, 30, C.rockPink, -360);
+  ridge(7.7, 24, 16, C.rockSand, -300);
+
+  // ---------- Characters ----------
+  // A character is data: low-poly parts, each tagged with a color role. "cloth" parts take a
+  // per-person outfit color, "hair" parts a per-person hair color, everything else is fixed.
+  // Limb tags (1/2 = left/right leg, 3/4 = left/right arm) let the GPU swing arms and legs,
+  // so running costs nothing on the CPU. New purchasable characters = new entries here.
+  const HIP = 0.46, SHOULDER = 0.8;
+  const cyl = (rt, rb, h, seg = 10) => new THREE.CylinderGeometry(rt, rb, h, seg);
+  const sph = (r, ...a) => new THREE.SphereGeometry(r, 14, 10, ...a);
+  const box = (x, y, z) => new THREE.BoxGeometry(x, y, z);
+  const at = (g, x, y, z) => g.translate(x, y, z);
+  const SKIN_A = 0xeab894, SKIN_B = 0xf2c6a2, INK_DARK = 0x221510;
+
+  function face(y, skin, lips) {
+    return [
+      [at(sph(0.022), -0.055, y + 0.01, -0.15), INK_DARK],
+      [at(sph(0.022), 0.055, y + 0.01, -0.15), INK_DARK],
+      [at(sph(0.008), -0.048, y + 0.02, -0.168), 0xffffff],
+      [at(sph(0.008), 0.062, y + 0.02, -0.168), 0xffffff],
+      [at(box(0.05, 0.012, 0.012), -0.055, y + 0.055, -0.152), 'hair'],
+      [at(box(0.05, 0.012, 0.012), 0.055, y + 0.055, -0.152), 'hair'],
+      [at(box(0.045, 0.012, 0.01), 0, y - 0.065, -0.155), lips],
+      [at(sph(0.03).scale(1, 0.6, 0.3), -0.09, y - 0.03, -0.135), 0xf3a3a3],
+      [at(sph(0.03).scale(1, 0.6, 0.3), 0.09, y - 0.03, -0.135), 0xf3a3a3],
+      [at(sph(0.03), -0.165, y, 0), skin],
+      [at(sph(0.03), 0.165, y, 0), skin],
+    ];
+  }
+  function legs(jeans, shoe, sole) {
+    const out = [];
+    [[-0.075, 1], [0.075, 2]].forEach(([x, limb]) => {
+      out.push([at(cyl(0.062, 0.055, 0.4), x, 0.26, 0), jeans, limb]);
+      out.push([at(box(0.1, 0.07, 0.19), x, 0.045, -0.025), shoe, limb]);
+      out.push([at(box(0.104, 0.025, 0.194), x, 0.012, -0.025), sole, limb]);
+    });
+    return out;
+  }
+  function arms(sleeve, skin, sleeveLen) {
+    const out = [];
+    [[-0.19, 3], [0.19, 4]].forEach(([x, limb]) => {
+      out.push([at(cyl(0.045, 0.042, sleeveLen), x, SHOULDER - sleeveLen / 2, 0), sleeve, limb]);
+      out.push([at(cyl(0.036, 0.034, 0.32 - sleeveLen), x, SHOULDER - sleeveLen - (0.32 - sleeveLen) / 2, 0), skin, limb]);
+      out.push([at(sph(0.042), x, SHOULDER - 0.34, 0), skin, limb]);
+    });
+    return out;
+  }
+  const marker = (team) => [at(cyl(0.24, 0.24, 0.02, 20), 0, 0.01, 0), team];
+
+  const CHARACTERS = [
+    { id: 'arian', name: 'آرین', desc: 'هودی، جین و کتونی',
+      cloth: [0xf4f4f4, 0x2e2e2e, 0x9ec5e8, 0xf0c040, 0x9cc79c, 0xe07a5a],
+      hair: [0x1a1410, 0x2e1f16, 0x4a3020, 0x0f0f0f],
+      parts: (team) => [
+        marker(team),
+        ...legs(0x3b5a8a, 0xf4f4f4, 0xd94a3a),
+        [at(cyl(0.15, 0.155, 0.36), 0, 0.64, 0), 'cloth'],
+        [at(sph(0.11, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.2, 0.8, 0.9), 0, 0.8, 0.09), 'cloth'],
+        [at(box(0.16, 0.08, 0.02), 0, 0.56, -0.15), 'cloth'],
+        ...arms('cloth', SKIN_A, 0.26),
+        [at(cyl(0.05, 0.055, 0.08), 0, 0.84, 0), SKIN_A],
+        [at(sph(0.17), 0, 1.0, 0), SKIN_A],
+        [at(sph(0.178, 0, Math.PI * 2, 0, Math.PI * 0.42), 0, 1.0, 0.01), 'hair'],
+        [at(sph(0.1).scale(1.4, 0.55, 0.9), 0, 1.15, -0.07), 'hair'],
+        ...face(1.0, SKIN_A, 0xb4685a),
+      ] },
+    { id: 'tara', name: 'تارا', desc: 'تی‌شرت، جین و موی بلند',
+      cloth: [0xf7c6d9, 0xffffff, 0xc9b6f0, 0xf6e27a, 0x9fe0d0, 0xe85d75],
+      hair: [0x1a1410, 0x3b2418, 0x6b3e22, 0x8a5a2b, 0xc89b5a, 0x4a2c4f],
+      parts: (team) => [
+        marker(team),
+        ...legs(0x6f8fc0, 0xffffff, 0xf08fb0),
+        [at(cyl(0.13, 0.14, 0.34), 0, 0.64, 0), 'cloth'],
+        [at(cyl(0.145, 0.15, 0.06), 0, 0.48, 0), 0x6f8fc0],
+        ...arms('cloth', SKIN_B, 0.1),
+        [at(cyl(0.045, 0.05, 0.08), 0, 0.84, 0), SKIN_B],
+        [at(sph(0.165), 0, 0.99, 0), SKIN_B],
+        [at(sph(0.178, 0, Math.PI * 2, 0, Math.PI * 0.5), 0, 0.995, 0.012), 'hair'],
+        [at(cyl(0.15, 0.11, 0.42).scale(1, 1, 0.55), 0, 0.82, 0.07), 'hair'],
+        [at(sph(0.11).scale(1.45, 0.45, 0.7), -0.02, 1.08, -0.11), 'hair'],
+        ...face(0.99, SKIN_B, 0xd9606f),
+      ] },
+  ];
+
+  // Enemies: one fixed look for all of them, the little horned div of the Shahnameh.
+  const DIV = { id: 'div', parts: () => [
+    [at(cyl(0.07, 0.06, 0.3), -0.1, 0.15, 0), 0x5e2a6e, 1],
+    [at(cyl(0.07, 0.06, 0.3), 0.1, 0.15, 0), 0x5e2a6e, 2],
+    [at(sph(0.27).scale(1, 1.1, 0.95), 0, 0.58, 0), 0x7d3b8f],
+    [at(sph(0.2).scale(1, 0.9, 0.5), 0, 0.55, -0.14), 0xb27cc4],
+    [at(cyl(0.055, 0.05, 0.36), -0.3, 0.6, 0), 0x7d3b8f, 3],
+    [at(cyl(0.055, 0.05, 0.36), 0.3, 0.6, 0), 0x7d3b8f, 4],
+    [at(new THREE.ConeGeometry(0.05, 0.22, 8).rotateZ(0.5), -0.15, 0.97, 0), 0xf3e3c3],
+    [at(new THREE.ConeGeometry(0.05, 0.22, 8).rotateZ(-0.5), 0.15, 0.97, 0), 0xf3e3c3],
+    [at(sph(0.06), -0.09, 0.72, -0.22), 0xfff3b0],
+    [at(sph(0.06), 0.09, 0.72, -0.22), 0xfff3b0],
+    [at(sph(0.028), -0.09, 0.72, -0.27), INK_DARK],
+    [at(sph(0.028), 0.09, 0.72, -0.27), INK_DARK],
+    [at(box(0.16, 0.035, 0.03).rotateZ(0.25), -0.09, 0.81, -0.22), 0x3a1a40],
+    [at(box(0.16, 0.035, 0.03).rotateZ(-0.25), 0.09, 0.81, -0.22), 0x3a1a40],
+    [at(new THREE.ConeGeometry(0.025, 0.08, 6).rotateX(Math.PI), -0.07, 0.56, -0.25), 0xffffff],
+    [at(new THREE.ConeGeometry(0.025, 0.08, 6).rotateX(Math.PI), 0.07, 0.56, -0.25), 0xffffff],
+    [at(cyl(0.3, 0.3, 0.02, 20), 0, 0.01, 0), C.enemy],
+  ] };
+
+  // Boss: Zahhak, the serpent-shouldered king of the Shahnameh. Snakes sway from the shoulders.
+  function snake(sideX, limb) {
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(sideX * 0.2, 0.95, 0.04),
+      new THREE.Vector3(sideX * 0.36, 1.12, 0.08),
+      new THREE.Vector3(sideX * 0.46, 1.3, -0.02),
+      new THREE.Vector3(sideX * 0.4, 1.45, -0.16),
+    ]);
+    return [
+      [new THREE.TubeGeometry(curve, 16, 0.045, 7, false), 0x3f8a3a, limb],
+      [at(sph(0.075).scale(1, 0.75, 1.4), sideX * 0.39, 1.48, -0.22), 0x2f6e2c, limb],
+      [at(sph(0.018), sideX * 0.39 - 0.035, 1.52, -0.3), 0xffd23a, limb],
+      [at(sph(0.018), sideX * 0.39 + 0.035, 1.52, -0.3), 0xffd23a, limb],
+      [at(box(0.012, 0.01, 0.08), sideX * 0.39, 1.46, -0.35), 0xd23a3a, limb],
+    ];
+  }
+  const ZAHHAK = { id: 'zahhak', name: 'ضحاک', desc: 'غول آخر: شاه ماردوش', parts: () => [
+    [at(cyl(0.42, 0.42, 0.02, 24), 0, 0.01, 0), C.enemy],
+    [new THREE.LatheGeometry([[0.34, 0], [0.3, 0.4], [0.24, 0.8], [0.2, 0.96], [0.001, 0.98]].map(([x, y]) => new THREE.Vector2(x, y)), 14), 0x6e1f2a],
+    [at(new THREE.TorusGeometry(0.255, 0.035, 6, 18).rotateX(Math.PI / 2), 0, 0.56, 0), C.gold],
+    [at(cyl(0.06, 0.055, 0.42), -0.26, 0.7, 0), 0x6e1f2a],
+    [at(cyl(0.06, 0.055, 0.42), 0.26, 0.7, 0), 0x6e1f2a],
+    [at(sph(0.05), -0.26, 0.47, 0), 0xd9a77c],
+    [at(sph(0.05), 0.26, 0.47, 0), 0xd9a77c],
+    [at(cyl(0.06, 0.06, 0.08), 0, 1.0, 0), 0xd9a77c],
+    [at(sph(0.16), 0, 1.12, 0), 0xd9a77c],
+    [at(new THREE.ConeGeometry(0.11, 0.3, 9).rotateX(Math.PI), 0, 0.96, -0.08), 0x16100c],
+    [at(box(0.16, 0.035, 0.04), 0, 1.06, -0.15), 0x16100c],
+    [at(sph(0.022), -0.055, 1.14, -0.145), 0x16100c],
+    [at(sph(0.022), 0.055, 1.14, -0.145), 0x16100c],
+    [at(box(0.06, 0.015, 0.015).rotateZ(-0.4), -0.055, 1.18, -0.15), 0x16100c],
+    [at(box(0.06, 0.015, 0.015).rotateZ(0.4), 0.055, 1.18, -0.15), 0x16100c],
+    [at(cyl(0.17, 0.16, 0.12, 16), 0, 1.3, 0), C.gold],
+    ...[0, 1, 2, 3, 4, 5].map((k) => {
+      const a2 = (k / 6) * Math.PI * 2;
+      return [at(new THREE.ConeGeometry(0.035, 0.12, 6), Math.sin(a2) * 0.155, 1.41, Math.cos(a2) * 0.155), C.gold];
+    }),
+    [at(sph(0.03), 0, 1.3, -0.165), 0xd23a3a],
+    ...snake(-1, 3),
+    ...snake(1, 4),
+  ] };
+
+  // Merge tagged parts into one geometry with color, cloth/hair masks and limb ids.
+  function buildCharacter(def, team) {
+    const parts = def.parts(team);
+    let vCount = 0, iCount = 0;
+    for (const [g] of parts) { vCount += g.attributes.position.count; iCount += g.index.count; }
+    const A = { position: new Float32Array(vCount * 3), normal: new Float32Array(vCount * 3), color: new Float32Array(vCount * 3),
+      cloth: new Float32Array(vCount), hair: new Float32Array(vCount), limb: new Float32Array(vCount) };
+    const index = new Uint32Array(iCount);
+    let vo = 0, io = 0;
+    const c = new THREE.Color();
+    for (const [g, role, limb = 0] of parts) {
+      const n = g.attributes.position.count;
+      A.position.set(g.attributes.position.array, vo * 3);
+      A.normal.set(g.attributes.normal.array, vo * 3);
+      c.setHex(typeof role === 'number' ? role : 0xffffff);
+      for (let i = 0; i < n; i++) {
+        A.color.set([c.r, c.g, c.b], (vo + i) * 3);
+        A.cloth[vo + i] = role === 'cloth' ? 1 : 0;
+        A.hair[vo + i] = role === 'hair' ? 1 : 0;
+        A.limb[vo + i] = limb;
+      }
+      for (let i = 0; i < g.index.count; i++) index[io + i] = g.index.array[i] + vo;
+      vo += n; io += g.index.count;
+      g.dispose();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(A.position, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(A.normal, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(A.color, 3));
+    geo.setAttribute('clothMask', new THREE.BufferAttribute(A.cloth, 1));
+    geo.setAttribute('hairMask', new THREE.BufferAttribute(A.hair, 1));
+    geo.setAttribute('limb', new THREE.BufferAttribute(A.limb, 1));
+    geo.setIndex(new THREE.BufferAttribute(index, 1));
+    geo.computeBoundingSphere();
+    return geo;
+  }
+
+  // Shared vertex logic: limb swing around hip/shoulder, plus outline inflation for ink shells.
+  const charTime = { value: 0 };
+  const LIMB_GLSL = `
+    float ph = instanceMatrix[3].x * 2.7 + instanceMatrix[3].z * 1.9;
+    float sw = sin(uTime * 11.0 + ph) * uRun;
+    if (limb > 0.5) {
+      float side = (limb < 1.5 || (limb > 2.5 && limb < 3.5)) ? 1.0 : -1.0;
+      float isArm = step(2.5, limb);
+      float ang = sw * mix(0.75, -0.9, isArm) * side;
+      float py = mix(${HIP.toFixed(2)}, ${SHOULDER.toFixed(2)}, isArm);
+      float cs = cos(ang), sn = sin(ang);
+      vec2 yz = transformed.yz - vec2(py, 0.0);
+      transformed.yz = vec2(cs * yz.x - sn * yz.y, sn * yz.x + cs * yz.y) + vec2(py, 0.0);
+    }`;
+  function charMaterials(run) {
+    const uRun = { value: run };
+    const body = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: ramp });
+    body.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, { uTime: charTime, uRun });
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float uTime; uniform float uRun;\nattribute float clothMask; attribute float hairMask; attribute float limb; attribute vec3 hairColor;')
+        .replace('#include <color_vertex>', `
+          vColor = color;
+          #ifdef USE_INSTANCING_COLOR
+            vColor = mix(vColor, vColor * instanceColor.xyz, clothMask);
+          #endif
+          vColor = mix(vColor, hairColor, hairMask);`)
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + LIMB_GLSL);
+    };
+    const ink = new THREE.MeshBasicMaterial({ color: C.ink, side: THREE.BackSide });
+    ink.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, { uTime: charTime, uRun });
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float uTime; uniform float uRun;\nattribute float limb;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += normal * 0.018;\n' + LIMB_GLSL);
+    };
+    return { body, ink, uRun };
+  }
+
+  // A group of people: one InstancedMesh (+ ink shell) per character type, each with its own
+  // per-instance hair color buffer.
+  const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+  const geoCache = {};
+  const geoFor = (def, team) => (geoCache[def.id + team] ??= buildCharacter(def, team));
+  function makeCrowd(n, defs, team, spacing, facing, run) {
+    const mats = charMaterials(run);
+    const types = defs.map((def) => {
+      const geo = geoFor(def, team).clone();
+      const hair = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+      geo.setAttribute('hairColor', hair);
+      const m = new THREE.InstancedMesh(geo, mats.body, n);
+      const sm = new THREE.InstancedMesh(geo, mats.ink, n);
+      m.castShadow = true;
+      m.count = sm.count = 0;
+      scene.add(m, sm);
+      inkObjects.push(sm);
+      return { def, m, sm, hair };
+    });
+    const people = [];
+    const col = new THREE.Color();
+    for (let i = 0; i < n; i++) {
+      const r = spacing * Math.sqrt(i), a = i * GOLDEN;
+      const type = types[i % types.length];
+      const slot = type.m.count++;
+      type.sm.count++;
+      const d = type.def;
+      type.m.setColorAt(slot, col.setHex(d.cloth ? d.cloth[(i * 7) % d.cloth.length] : 0xffffff));
+      col.setHex(d.hair ? d.hair[(i * 5) % d.hair.length] : 0);
+      type.hair.setXYZ(slot, col.r, col.g, col.b);
+      people.push({ ox: Math.cos(a) * r, oz: Math.sin(a) * r, type, slot, s: 0.94 + ((i * 37) % 11) / 100, ph: i * 1.7 });
+    }
+    types.forEach((t) => { if (t.m.instanceColor) t.m.instanceColor.needsUpdate = true; });
+    return { types, people, x: 0, z: 0, facing, run };
+  }
+  const tmp = new THREE.Object3D();
+  function poseCrowd(c, t, running) {
+    charTime.value = t;
+    for (const p of c.people) {
+      const s = running ? Math.sin(t * 11 + p.ph) : Math.sin(t * 2 + p.ph) * 0.2;
+      tmp.position.set(c.x + p.ox, running ? Math.abs(s) * 0.07 : 0, c.z + p.oz);
+      tmp.rotation.set(running ? 0.12 : 0, c.facing + (running ? 0 : s * 0.2), 0);
+      tmp.scale.setScalar(p.s);
+      tmp.updateMatrix();
+      p.type.m.setMatrixAt(p.slot, tmp.matrix);
+      p.type.sm.setMatrixAt(p.slot, tmp.matrix);
+    }
+    for (const ty of c.types) { ty.m.instanceMatrix.needsUpdate = true; ty.sm.instanceMatrix.needsUpdate = true; }
+  }
+  const player = makeCrowd(40, CHARACTERS, C.team, 0.42, 0, 1);
+  const enemy = makeCrowd(36, [DIV], C.enemy, 0.5, Math.PI, 0.15);
+  enemy.z = -150;
+  const boss = makeCrowd(1, [ZAHHAK], C.enemy, 0, Math.PI, 0.25);
+  boss.people[0].s = 2.1;
+
+  // ---------- Character gallery (separate scene, shop-style: one character at a time) ----------
+  const gallery = new THREE.Scene();
+  gallery.background = new THREE.Color(0x24376e);
+  gallery.add(new THREE.HemisphereLight(0xfff4dc, 0x6b5a8a, 0.85));
+  const gSun = new THREE.DirectionalLight(0xfff0d0, 0.75);
+  gSun.position.set(-3, 6, -6);
+  gallery.add(gSun);
+  const galleryCam = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.4, 0.25, 40), toon(0xffffff, tileTex));
+  stand.position.y = -0.13;
+  gallery.add(stand);
+  const galleryMats = charMaterials(1);
+  const SHOWCASE = [...CHARACTERS, { ...DIV, name: 'دیو', desc: 'دشمن: همه یک شکل' }, ZAHHAK];
+  const showcase = SHOWCASE.map((def) => {
+    const geo = geoFor(def, def.cloth ? C.team : C.enemy).clone();
+    const hair = new THREE.InstancedBufferAttribute(new Float32Array(3), 3);
+    geo.setAttribute('hairColor', hair);
+    const m = new THREE.InstancedMesh(geo, galleryMats.body, 1);
+    m.setColorAt(0, new THREE.Color(def.cloth ? def.cloth[0] : 0xffffff));
+    m.setMatrixAt(0, new THREE.Matrix4());
+    const sm = new THREE.InstancedMesh(geo, galleryMats.ink, 1);
+    sm.setMatrixAt(0, new THREE.Matrix4());
+    inkObjects.push(sm);
+    const holder = new THREE.Group();
+    holder.add(m, sm);
+    holder.scale.setScalar(1.55);
+    holder.visible = false;
+    gallery.add(holder);
+    return { holder, def, m, hair, k: -1 };
+  });
+  let current = 0;
+  const shopName = document.getElementById('shop-name');
+  const shopCount = document.getElementById('shop-count');
+  function showCharacter(i) {
+    current = (i + showcase.length) % showcase.length;
+    showcase.forEach((s, j) => (s.holder.visible = j === current));
+    const d = showcase[current].def;
+    shopName.textContent = d.name;
+    shopCount.textContent = d.desc;
+  }
+  document.getElementById('shop-prev').addEventListener('click', () => showCharacter(current - 1));
+  document.getElementById('shop-next').addEventListener('click', () => showCharacter(current + 1));
+  showCharacter(0);
+  let galleryOn = false;
+  let galleryTimer = 0;
+  const gCol = new THREE.Color();
+  function galleryTick(dt) {
+    galleryTimer += dt;
+    const s = showcase[current];
+    s.holder.rotation.y = Math.PI + galleryTimer * 0.8;
+    galleryMats.uRun.value = s.def.cloth ? 0.8 : 0.25;
+    s.holder.scale.setScalar(s.def.id === 'zahhak' ? 1.15 : 1.55);
+    // Cycle outfit and hair colors to show the variety.
+    const k = Math.floor(galleryTimer / 1.4);
+    if (k !== s.k && s.def.cloth) {
+      s.k = k;
+      s.m.setColorAt(0, gCol.setHex(s.def.cloth[k % s.def.cloth.length]));
+      s.m.instanceColor.needsUpdate = true;
+      gCol.setHex(s.def.hair[k % s.def.hair.length]);
+      s.hair.setXYZ(0, gCol.r, gCol.g, gCol.b);
+      s.hair.needsUpdate = true;
+    }
+  }
+
+  // ---------- Life: pigeons and falling petals ----------
+  const wingGeo = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0.7, 0, -0.25, 0.1, 0, 0.3], 3));
+  wingGeo.computeVertexNormals();
+  const birdMat = new THREE.MeshBasicMaterial({ color: 0xf6f1e6, side: THREE.DoubleSide });
+  const birds = [];
+  for (let i = 0; i < 9; i++) {
+    const b = new THREE.Group();
+    const l = new THREE.Mesh(wingGeo, birdMat);
+    const r = new THREE.Mesh(wingGeo, birdMat);
+    r.scale.x = -1;
+    b.add(l, r);
+    b.userData = { l, r, a: i * 0.7, rad: 10 + (i % 3) * 4, y: 9 + (i % 4) * 1.5, sp: 0.35 + (i % 3) * 0.1 };
+    scene.add(b);
+    birds.push(b);
+  }
+
+  const PETALS = 220;
+  const petalPos = new Float32Array(PETALS * 3);
+  for (let i = 0; i < PETALS; i++) {
+    petalPos[i * 3] = (Math.random() - 0.5) * 26;
+    petalPos[i * 3 + 1] = Math.random() * 12;
+    petalPos[i * 3 + 2] = -Math.random() * 40 + 8;
+  }
+  const petalGeo = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(petalPos, 3));
+  const petalTex = canvasTex(32, 32, (g) => { g.fillStyle = hex(C.blossom); g.beginPath(); g.ellipse(16, 16, 12, 7, 0.6, 0, Math.PI * 2); g.fill(); });
+  const petals = new THREE.Points(petalGeo, new THREE.PointsMaterial({ size: 0.28, map: petalTex, transparent: true, depthWrite: false }));
+  scene.add(petals);
+
+  // ---------- Input ----------
+  let steer = 0, steerTarget = 0, dragX = null, dragStart = 0;
+  const canvas = renderer.domElement;
+  canvas.addEventListener('pointerdown', (e) => { dragX = e.clientX; dragStart = steerTarget; });
+  window.addEventListener('pointermove', (e) => {
+    if (dragX === null) return;
+    steerTarget = Math.max(-1, Math.min(1, dragStart + (e.clientX - dragX) / (Math.min(window.innerWidth, 500) / 2)));
+  });
+  window.addEventListener('pointerup', () => { dragX = null; });
+  window.addEventListener('pointercancel', () => { dragX = null; });
+
+  // ---------- Controls ----------
+  const cam = { ...POSES.intro }, target = { ...POSES.intro };
+  let introTimer = 0;
+  function playIntro() {
+    clearTimeout(introTimer);
+    Object.assign(cam, POSES.intro); Object.assign(target, POSES.intro);
+    introTimer = setTimeout(() => Object.assign(target, POSES.run), 2200);
+  }
+  document.getElementById('replay').addEventListener('click', playIntro);
+  const galBtn = document.getElementById('gallery');
+  galBtn.addEventListener('click', () => {
+    galleryOn = !galleryOn;
+    galBtn.setAttribute('aria-pressed', String(galleryOn));
+    galBtn.textContent = galleryOn ? 'برگشت به خیابان' : 'گالری شخصیت‌ها';
+    document.getElementById('shop').hidden = !galleryOn;
+  });
+  const inkBtn = document.getElementById('ink');
+  inkBtn.addEventListener('click', () => {
+    const on = inkBtn.getAttribute('aria-pressed') !== 'true';
+    inkBtn.setAttribute('aria-pressed', String(on));
+    inkBtn.textContent = on ? 'قلم‌گیری: روشن' : 'قلم‌گیری: خاموش';
+    inkObjects.forEach((o) => (o.visible = on));
+  });
+
+  // ---------- Loop ----------
+  function resize() {
+    const w = view.clientWidth, h = view.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let last = performance.now(), t = 0;
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now; t += dt;
+    const k = 1 - Math.exp(-2.5 * dt);
+
+    steer += (steerTarget - steer) * (1 - Math.exp(-10 * dt));
+    player.x = steer * (ROAD_W / 2 - 1.8);
+    const move = (reduceMotion ? 0.4 : 1) * SPEED * dt;
+    for (const o of scrollers) { o.position.z += move; if (o.position.z > 14) o.position.z -= LOOP; }
+    enemy.z += move; if (enemy.z > 14) enemy.z -= LOOP;
+    poseCrowd(player, t, true);
+    poseCrowd(enemy, t, false);
+    boss.z = enemy.z - 5.5;
+    poseCrowd(boss, t, false);
+
+    for (const b of birds) {
+      const u = b.userData;
+      u.a += u.sp * dt;
+      b.position.set(Math.cos(u.a) * u.rad, u.y + Math.sin(t * 0.8 + u.a) * 0.6, -14 + Math.sin(u.a) * u.rad * 0.6);
+      b.rotation.y = -u.a;
+      const flap = Math.sin(t * 9 + u.a * 5) * 0.7;
+      u.l.rotation.z = flap; u.r.rotation.z = -flap;
+    }
+    for (let i = 0; i < PETALS; i++) {
+      const j = i * 3;
+      petalPos[j] += Math.sin(t + i) * 0.4 * dt;
+      petalPos[j + 1] -= (0.5 + (i % 5) * 0.12) * dt;
+      petalPos[j + 2] += move;
+      if (petalPos[j + 1] < 0 || petalPos[j + 2] > 10) { petalPos[j + 1] = 8 + Math.random() * 4; petalPos[j + 2] = -30 - Math.random() * 10; }
+    }
+    petalGeo.attributes.position.needsUpdate = true;
+
+    for (const key of ['h', 'd', 'l', 'f']) cam[key] += (target[key] - cam[key]) * k;
+    const cx = player.x * 0.6;
+    camera.position.set(cx, cam.h, cam.d);
+    camera.lookAt(cx * 0.5, 0.8, -cam.l);
+    if (Math.abs(camera.fov - cam.f) > 0.01) { camera.fov = cam.f; camera.updateProjectionMatrix(); }
+    sun.position.set(player.x - 10, 22, 12);
+    sun.target.position.set(player.x, 0, -4);
+
+    if (galleryOn) {
+      galleryTick(dt);
+      galleryCam.aspect = camera.aspect;
+      galleryCam.fov = camera.aspect < 1 ? 44 : 34;
+      galleryCam.position.set(0, 2.2, 5.6);
+      galleryCam.lookAt(0, 0.9, 0);
+      galleryCam.updateProjectionMatrix();
+      renderer.render(gallery, galleryCam);
+    } else {
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame(frame);
+  }
+  const start = () => { buildGates(); playIntro(); requestAnimationFrame(frame); };
+  (document.fonts ? document.fonts.load('900 76px Vazirmatn').catch(() => {}) : Promise.resolve()).then(start, start);
+})();
+</script>
