@@ -103,13 +103,15 @@ export function characterMaterials(run: number): CharacterMaterials {
         '#include <common>',
         '#include <common>\nuniform float uTime;\nuniform float uRun;\nattribute float clothMask;\nattribute float hairMask;\nattribute float limb;\nattribute vec3 hairColor;',
       )
+      // Keep three's own color setup (vColor may be vec3 or vec4), then override the rgb.
       .replace(
         '#include <color_vertex>',
-        `vColor = color;
+        `#include <color_vertex>
+        vColor.xyz = color.xyz;
         #ifdef USE_INSTANCING_COLOR
-          vColor = mix(vColor, vColor * instanceColor.xyz, clothMask);
+          vColor.xyz = mix(vColor.xyz, vColor.xyz * instanceColor.xyz, clothMask);
         #endif
-        vColor = mix(vColor, hairColor, hairMask);`,
+        vColor.xyz = mix(vColor.xyz, hairColor, hairMask);`,
       )
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + LIMB_GLSL);
   };

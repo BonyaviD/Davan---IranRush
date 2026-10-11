@@ -28,7 +28,7 @@ export function buildSky(world: WorldConfig, span: Span, end: number, root: THRE
       vertexShader:
         'varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader:
-        'uniform vec3 top; uniform vec3 bottom; varying float vY; void main(){ gl_FragColor = vec4(mix(bottom, top, smoothstep(0.0, 0.45, vY)), 1.0); #include <colorspace_fragment> }',
+        'uniform vec3 top;\nuniform vec3 bottom;\nvarying float vY;\nvoid main() {\n  gl_FragColor = vec4(mix(bottom, top, smoothstep(0.0, 0.45, vY)), 1.0);\n  #include <colorspace_fragment>\n}',
     }),
   );
   sky.position.z = (span.from + span.to) / 2;
