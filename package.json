@@ -9,7 +9,11 @@
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "cap:sync": "npm run build && cap sync",
+    "android": "npm run cap:sync && cap open android",
+    "ios": "npm run cap:sync && cap open ios",
+    "android:apk": "npm run cap:sync && cd android && ./gradlew assembleDebug"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.3",
