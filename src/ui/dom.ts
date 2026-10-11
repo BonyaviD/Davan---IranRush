@@ -1,0 +1,17 @@
+/** Minimal DOM helpers for the overlay. */
+export function uiRoot(): HTMLElement {
+  const el = document.getElementById('ui');
+  if (!el) throw new Error('#ui root missing');
+  return el;
+}
+
+export function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className: string,
+  text?: string,
+): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}

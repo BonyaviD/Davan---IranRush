@@ -1,2 +1,2 @@
-/** Obstacle placeholder entity (rectangle/circle + AABB). TODO(M1/M2). */
+/** Obstacle placeholder entity (rectangle + AABB). Implemented in M2 with world obstacles. */
 export {};
