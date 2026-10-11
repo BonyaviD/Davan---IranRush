@@ -48,6 +48,9 @@ body {
 
 /* The canvas is LTR so in-world numeric labels like "+۱۰" are not bidi-reordered. */
 #game canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
   direction: ltr;
 }
 

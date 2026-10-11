@@ -7,17 +7,16 @@ export class Hud {
   private readonly levelEl = el('div', 'hud-pill');
   private readonly countEl = el('div', 'hud-pill');
 
-  constructor(levelNumber: number) {
-    this.levelEl.textContent = `مرحله‌ی ${toFaDigits(levelNumber)}`;
+  constructor() {
     this.root.append(this.levelEl, this.countEl);
     uiRoot().append(this.root);
   }
 
-  setCount(n: number): void {
-    this.countEl.textContent = `تعداد: ${toFaDigits(n)}`;
+  setLevel(levelNumber: number, worldName: string): void {
+    this.levelEl.textContent = `${worldName} · مرحله‌ی ${toFaDigits(levelNumber)}`;
   }
 
-  destroy(): void {
-    this.root.remove();
+  setCount(n: number): void {
+    this.countEl.textContent = `تعداد: ${toFaDigits(n)}`;
   }
 }

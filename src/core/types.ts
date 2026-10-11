@@ -49,23 +49,29 @@ export interface LevelData {
 
 export type WorldId = 'bazaar' | 'isfahan' | 'tehran';
 
-export interface ParallaxLayerDef {
-  /** Asset key; placeholder textures are generated at boot under the same key. */
-  key: string;
-  /** 0 = static, 1 = moves with the track. */
-  speed: number;
-  /** Placeholder tint until real art exists. */
-  color: number;
-}
+export type LandmarkId = 'bazaar-dome' | 'siosepol' | 'milad';
 
 export interface WorldPalette {
-  background: number;
-  track: number;
-  trackEdge: number;
+  sky: number;
+  ground: number;
+  road: number;
+  roadLine: number;
+  sidewalk: number;
   gatePositive: number;
   gateNegative: number;
   crowd: number;
   enemy: number;
+  /** Building/wall colors picked in rotation. */
+  facades: number[];
+  foliage: number[];
+}
+
+/** Camera placement relative to the crowd (meters / degrees). */
+export interface CameraPose {
+  height: number;
+  distance: number;
+  lookAhead: number;
+  fov: number;
 }
 
 export interface WorldConfig {
@@ -73,10 +79,16 @@ export interface WorldConfig {
   /** Persian display name (rendered by DOM UI only). */
   name: string;
   palette: WorldPalette;
-  parallax: ParallaxLayerDef[];
+  landmark: LandmarkId;
+  /** Fog distances in meters (near, far). */
+  fog: [number, number];
   /** Obstacle kinds this world may use; used by level validation. */
   obstacleKinds: ObstacleKind[];
+  /** Optional per-world camera overrides. */
+  camera?: Partial<Record<CameraMode, Partial<CameraPose>>>;
   night?: boolean;
 }
+
+export type CameraMode = 'intro' | 'run' | 'battle';
 
 export type RunResult = 'win' | 'lose';

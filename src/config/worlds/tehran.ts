@@ -1,22 +1,23 @@
 import type { WorldConfig } from '../../core/types';
 
-/** تهران: خیابان درختی، میدان با دروازه، برج دوردست، ترافیک عرضی، نسخه‌ی شبانه */
+/** تهران: خیابان چناری، برج میلاد، البرز، ترافیک عرضی */
 export const tehran: WorldConfig = {
   id: 'tehran',
   name: 'تهران',
   palette: {
-    background: 0x141a2e,
-    track: 0x3c3f46,
-    trackEdge: 0xe6e6e6,
+    sky: 0xf3c58f,
+    ground: 0xcfb08a,
+    road: 0x45464c,
+    roadLine: 0xf2f2f2,
+    sidewalk: 0xb9a58c,
     gatePositive: 0x2ecc71,
     gateNegative: 0xe74c3c,
-    crowd: 0xf1c40f,
-    enemy: 0x9b59b6,
+    crowd: 0x2f7de1,
+    enemy: 0xc8372d,
+    facades: [0xd8c3a0, 0xc7a27c, 0xe2d6c2, 0xb88a64, 0xcdb9a0],
+    foliage: [0x4f8a3c, 0x5c9945, 0x46803a],
   },
-  parallax: [
-    { key: 'tehran-tower', speed: 0.05, color: 0x2b3555 },
-    { key: 'tehran-trees', speed: 0.7, color: 0x2e6b3a },
-  ],
+  landmark: 'milad',
+  fog: [90, 650],
   obstacleKinds: ['static', 'crossing'],
-  night: true,
 };

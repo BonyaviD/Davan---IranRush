@@ -6,7 +6,7 @@ export default defineConfig({
   build: {
     target: 'es2020',
     assetsInlineLimit: 0,
-    chunkSizeWarningLimit: 1600, // Phaser alone is ~1.2MB minified
+    chunkSizeWarningLimit: 900, // three.js is ~600KB minified
   },
   test: {
     include: ['tests/**/*.test.ts'],
