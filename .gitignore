@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+.vite/
+# Capacitor native projects are added in M4
