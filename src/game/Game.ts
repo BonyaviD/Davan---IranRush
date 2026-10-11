@@ -13,6 +13,7 @@ import { CountLabel } from '../render/labels';
 import { Stage } from '../render/Stage';
 import { buildEnvironment } from '../render/environment';
 import { disposeTree, lambert } from '../render/environment/common';
+import { CameraPanel } from '../ui/CameraPanel';
 import { Hud } from '../ui/Hud';
 import { ResultPanel } from '../ui/ResultPanel';
 import { DragInput } from './Input';
@@ -64,6 +65,10 @@ export class Game {
     this.rig = new CameraRig(this.stage.camera);
     this.input = new DragInput(this.stage.canvas);
     this.stage.scene.add(this.crowd.mesh, this.enemy.mesh, this.crowdLabel.sprite, this.enemyLabel.sprite);
+    new CameraPanel({
+      onPose: (pose) => this.rig.setRunPose(pose),
+      onAutoZoom: (on) => (this.rig.autoZoom = on),
+    });
   }
 
   start(levelId: string): void {
@@ -241,12 +246,13 @@ export class Game {
     this.crowd.centerX = x;
     this.crowd.centerZ = z;
     this.crowd.update(dt, this.time, running);
+    for (let i = 0; i < this.gates.length; i++) this.gates[i]!.update(dt);
     this.enemy.update(dt, this.time, false);
 
     this.crowdLabel.sprite.position.set(x, LABEL_Y, z);
     this.enemyLabel.sprite.position.set(0, LABEL_Y, this.enemy.centerZ);
 
-    this.rig.update(dt, x, z);
+    this.rig.update(dt, x, z, this.crowd.radius);
     this.stage.followLight(x, z);
   }
 }

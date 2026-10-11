@@ -141,3 +141,118 @@ body {
     opacity: 0;
   }
 }
+
+/* ---------- Camera picker ---------- */
+.cam-toggle {
+  position: absolute;
+  top: calc(var(--safe-top) + 60px);
+  left: calc(var(--safe-left) + 16px);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.cam-toggle[aria-expanded='true'] {
+  background: #e07a1f;
+  border-color: #e07a1f;
+}
+
+.cam-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  gap: 10px;
+  padding: 12px 16px calc(var(--safe-bottom) + 12px);
+  background: rgba(24, 18, 14, 0.86);
+  border-top: 1px solid rgba(255, 235, 210, 0.16);
+  backdrop-filter: blur(8px);
+  font-size: 13px;
+}
+
+.cam-presets {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cam-preset {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 2px;
+  font: inherit;
+  color: #fff;
+  background: transparent;
+  border: 1px solid rgba(255, 235, 210, 0.2);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.cam-preset b {
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.cam-preset span {
+  font-size: 10px;
+  color: #c9b8a6;
+}
+
+.cam-preset[aria-pressed='true'] {
+  background: #e07a1f;
+  border-color: #e07a1f;
+}
+
+.cam-preset[aria-pressed='true'] span {
+  color: #fff;
+}
+
+.cam-sliders {
+  display: grid;
+  gap: 6px;
+}
+
+.cam-row {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 8px;
+}
+
+.cam-row input {
+  width: 100%;
+  accent-color: #e07a1f;
+}
+
+.cam-row output {
+  font-variant-numeric: tabular-nums;
+}
+
+.cam-zoom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cam-zoom input {
+  width: 18px;
+  height: 18px;
+  accent-color: #e07a1f;
+}
+
+.cam-readout {
+  font-size: 12px;
+  color: #c9b8a6;
+}
+
+[hidden] {
+  display: none !important;
+}

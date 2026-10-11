@@ -27,12 +27,25 @@ export const GAME = {
     tickSec: 0.05,
   },
 
-  /** Camera rig. 'intro' shows the world's landmark, 'run' is the main gameplay view. */
+  /**
+   * Camera rig. 'intro' shows the world's landmark, 'run' is the gameplay view and
+   * 'battle' is derived from 'run'. The player can pick any preset in the camera panel.
+   */
   camera: {
     intro: { height: 2.6, distance: 7.5, lookAhead: 30, fov: 62 },
-    run: { height: 3, distance: 7.5, lookAhead: 16, fov: 62 },
-    battle: { height: 3.6, distance: 8.5, lookAhead: 6, fov: 58 },
+    run: { height: 4, distance: 8, lookAhead: 8, fov: 60 },
+    battle: { height: 4.6, distance: 9, lookAhead: 4, fov: 58 },
   } satisfies Record<CameraMode, CameraPose>,
+  /** Selectable run-camera presets (keys are shown as Persian letters in the UI). */
+  cameraPresets: {
+    a: { height: 4, distance: 8, lookAhead: 8, fov: 60 },
+    b: { height: 10, distance: 13, lookAhead: 4, fov: 55 },
+    c: { height: 19, distance: 11, lookAhead: 2, fov: 50 },
+    d: { height: 2.6, distance: 7.5, lookAhead: 30, fov: 62 },
+    e: { height: 3, distance: 7.5, lookAhead: 16, fov: 62 },
+  } satisfies Record<string, CameraPose>,
+  /** Auto-zoom: extra meters of height/distance per meter of crowd radius beyond the base size. */
+  cameraCrowdZoom: { baseRadius: 1.5, height: 0.9, distance: 1.3 },
   /** How fast the camera blends between modes (per-second rate). */
   cameraLerp: 2.5,
 

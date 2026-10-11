@@ -46,4 +46,16 @@ export class GatePair {
     this.passed = true;
     this.panels.forEach((m, i) => (m.opacity = i === chosen ? 0.15 : 0.45));
   }
+
+  /** Passed gates fade out so they never block the camera's view of the crowd. */
+  update(dt: number): void {
+    if (!this.passed || !this.group.visible) return;
+    const k = Math.exp(-4 * dt);
+    let visible = false;
+    for (const m of this.panels) {
+      m.opacity *= k;
+      if (m.opacity > 0.02) visible = true;
+    }
+    this.group.visible = visible;
+  }
 }
