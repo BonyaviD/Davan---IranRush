@@ -26,7 +26,7 @@ export interface CameraPanelHandlers {
   onAutoZoom: (on: boolean) => void;
 }
 
-/** Camera picker: a toggle button plus a bottom sheet with presets, sliders and auto-zoom. */
+/** Camera picker sheet (opened from settings): presets, sliders and auto-zoom. */
 export class CameraPanel {
   private readonly sheet = el('div', 'cam-sheet interactive');
   private readonly buttons = new Map<PresetKey, HTMLButtonElement>();
@@ -37,13 +37,6 @@ export class CameraPanel {
 
   constructor(private readonly handlers: CameraPanelHandlers) {
     this.settings = loadCameraSettings() ?? { preset: 'a', pose: { ...GAME.cameraPresets.a }, autoZoom: true };
-
-    const toggle = el('button', 'cam-toggle interactive', 'دوربین');
-    toggle.setAttribute('aria-expanded', 'false');
-    toggle.addEventListener('click', () => {
-      this.sheet.hidden = !this.sheet.hidden;
-      toggle.setAttribute('aria-expanded', String(!this.sheet.hidden));
-    });
 
     const presets = el('div', 'cam-presets');
     (Object.keys(GAME.cameraPresets) as PresetKey[]).forEach((k) => {
@@ -78,13 +71,23 @@ export class CameraPanel {
     });
     zoomRow.append(this.zoomBox, el('span', '', 'زوم خودکار با بزرگ شدن گروه'));
 
+    const close = el('button', 'btn', 'تأیید');
+    close.addEventListener('click', () => this.close());
     this.sheet.hidden = true;
-    this.sheet.append(presets, sliders, zoomRow, this.readout);
-    uiRoot().append(toggle, this.sheet);
+    this.sheet.append(el('h2', 'sheet-title', 'دوربین'), presets, sliders, zoomRow, this.readout, close);
+    uiRoot().append(this.sheet);
 
     this.zoomBox.checked = this.settings.autoZoom;
     handlers.onAutoZoom(this.settings.autoZoom);
     this.apply(this.settings.pose, this.settings.preset);
+  }
+
+  open(): void {
+    this.sheet.hidden = false;
+  }
+
+  close(): void {
+    this.sheet.hidden = true;
   }
 
   private apply(pose: CameraPose, preset: string | null): void {

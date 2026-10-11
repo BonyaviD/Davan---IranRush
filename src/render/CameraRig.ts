@@ -15,6 +15,7 @@ export class CameraRig {
   private mode: CameraMode = 'run';
   private poses: Record<CameraMode, CameraPose> = { ...GAME.camera };
   private runOverride: CameraPose | null = null;
+  private shake = 0;
 
   constructor(private readonly camera: THREE.PerspectiveCamera) {}
 
@@ -41,6 +42,11 @@ export class CameraRig {
     if (snap) Object.assign(this.pose, this.target);
   }
 
+  /** Adds screen shake (meters of jitter), decaying quickly. */
+  addShake(amount: number): void {
+    this.shake = Math.min(0.5, this.shake + amount);
+  }
+
   update(dt: number, crowdX: number, crowdZ: number, crowdRadius: number): void {
     const p = this.pose;
     const t = this.target;
@@ -53,7 +59,10 @@ export class CameraRig {
     p.fov = damp(p.fov, t.fov, r, dt);
 
     const cx = crowdX * 0.6;
-    this.camera.position.set(cx, p.height, crowdZ + p.distance);
+    this.shake *= Math.exp(-6 * dt);
+    const jx = (Math.random() - 0.5) * this.shake;
+    const jy = (Math.random() - 0.5) * this.shake;
+    this.camera.position.set(cx + jx, p.height + jy, crowdZ + p.distance);
     this.camera.lookAt(cx * 0.5, 0.8, crowdZ - p.lookAhead);
     if (Math.abs(this.camera.fov - p.fov) > 0.01) {
       this.camera.fov = p.fov;

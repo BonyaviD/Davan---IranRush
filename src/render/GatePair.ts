@@ -15,6 +15,9 @@ export class GatePair {
   readonly group = new THREE.Group();
   passed = false;
   private readonly panels: THREE.MeshBasicMaterial[] = [];
+  /** Real textures for mystery gates, swapped in by reveal(). */
+  private readonly hiddenMaps: (THREE.Texture | null)[] = [];
+  revealed = true;
 
   constructor(
     readonly segment: GateSegment,
@@ -24,8 +27,11 @@ export class GatePair {
     const p = world.palette;
     segment.gates.forEach((gate, i) => {
       const color = isPositiveGate(gate) ? p.gatePositive : p.gateNegative;
+      const real = gateTexture(formatGate(gate), color);
+      if (gate.hidden) this.revealed = false;
+      this.hiddenMaps.push(gate.hidden ? real : null);
       const mat = new THREE.MeshBasicMaterial({
-        map: gateTexture(formatGate(gate), color),
+        map: gate.hidden ? gateTexture('؟', 0x5b4a8a) : real,
         transparent: true,
         side: THREE.DoubleSide,
         depthWrite: false,
@@ -45,6 +51,19 @@ export class GatePair {
     }
     this.group.userData.keepGeometry = true;
     this.group.position.z = -segment.z * GAME.metersPerUnit;
+  }
+
+  /** Shows the real values of mystery gates. */
+  reveal(): void {
+    if (this.revealed) return;
+    this.revealed = true;
+    this.panels.forEach((m, i) => {
+      const real = this.hiddenMaps[i];
+      if (!real) return;
+      m.map?.dispose();
+      m.map = real;
+      m.needsUpdate = true;
+    });
   }
 
   markPassed(chosen: 0 | 1): void {

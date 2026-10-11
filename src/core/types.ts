@@ -8,6 +8,8 @@ export type GateOp = 'add' | 'sub' | 'mul' | 'div';
 export interface GateDef {
   op: GateOp;
   value: number;
+  /** Mystery gate: shows "؟" until the crowd is close. */
+  hidden?: boolean;
 }
 
 /** A pair of gates side by side at the same z. Index 0 = left lane, 1 = right lane. */
@@ -18,18 +20,23 @@ export interface GateSegment {
 
 export type ObstacleKind = 'static' | 'crossing';
 
+/** Something on the road that knocks people out of the crowd on contact. */
 export interface ObstacleDef {
   z: number;
   kind: ObstacleKind;
   /** Lane-relative x in [-1, 1] (0 = center). For 'crossing' this is the start x. */
   x: number;
-  /** Width as a fraction of track width. */
-  width: number;
+  /** Half-width in lane units (1 = half the road). */
+  halfWidth: number;
   /** People lost on contact. */
   damage: number;
-  /** Lateral speed (track widths / sec) for 'crossing' obstacles. */
+  /** Lateral speed in lane units per second, for 'crossing' obstacles. */
   speed?: number;
+  /** Visual: taxi, motorbike, cart, fountain... */
+  look: ObstacleLook;
 }
+
+export type ObstacleLook = 'taxi' | 'motor' | 'cart' | 'urn';
 
 /** A group of regular enemies (divs) standing on the path. */
 export interface EnemyDef {
@@ -37,7 +44,7 @@ export interface EnemyDef {
   count: number;
 }
 
-export type BossKind = 'zahhak' | 'div-sepid';
+export type BossKind = 'zahhak' | 'div-sepid' | 'akvan';
 
 /** The giant at the end of every path. hp works like an enemy count. */
 export interface BossDef {

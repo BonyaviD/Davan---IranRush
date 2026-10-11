@@ -18,10 +18,15 @@ describe.each(LEVELS.map((l) => [l.id, l] as const))('level %s', (_id, level) =>
 });
 
 describe('simulateRun', () => {
-  it('plays the tehran-01 best path through both div groups and Zahhak', () => {
-    const tehran = LEVELS.find((l) => l.id === 'tehran-01')!;
-    expect(simulateRun(tehran, [0, 0, 1, 1, 0])).toEqual({ count: 50, result: 'win' });
-    expect(simulateRun(tehran, [0, 1, 1, 1, 0]).result).toBe('lose');
+  it('plays the tehran-06 best path through three div groups and Zahhak', () => {
+    const tehran = LEVELS.find((l) => l.id === 'tehran-06')!;
+    expect(simulateRun(tehran, [1, 0, 1, 1, 0])).toEqual({ count: 30, result: 'win' });
+    expect(simulateRun(tehran, [1, 1, 1, 1, 0]).result).toBe('lose');
+  });
+
+  it('ships 12 levels with unique ids', () => {
+    expect(LEVELS).toHaveLength(12);
+    expect(new Set(LEVELS.map((l) => l.id)).size).toBe(12);
   });
 });
 

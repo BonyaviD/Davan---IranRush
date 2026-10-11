@@ -1,26 +1,24 @@
+import { Preferences } from '@capacitor/preferences';
+import { normalizeProgress, type Progress } from '../core/Economy';
+
 /**
- * Progress persistence. M3 swaps the backend to @capacitor/preferences on native,
- * keeping localStorage as the browser fallback. Callers only see this async API.
+ * Progress persistence. Capacitor Preferences stores natively on Android/iOS and falls back
+ * to localStorage in the browser, so one code path covers both.
  */
-export interface Progress {
-  unlockedLevel: number;
-}
+const KEY = 'davan.progress.v1';
 
-const KEY = 'davan.progress';
-const DEFAULT: Progress = { unlockedLevel: 0 };
-
-export async function loadProgress(): Promise<Progress> {
+export async function loadProgress(levelCount: number): Promise<Progress> {
   try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? { ...DEFAULT, ...(JSON.parse(raw) as Partial<Progress>) } : { ...DEFAULT };
+    const { value } = await Preferences.get({ key: KEY });
+    return normalizeProgress(value ? (JSON.parse(value) as Partial<Progress>) : null, levelCount);
   } catch {
-    return { ...DEFAULT };
+    return normalizeProgress(null, levelCount);
   }
 }
 
 export async function saveProgress(p: Progress): Promise<void> {
   try {
-    localStorage.setItem(KEY, JSON.stringify(p));
+    await Preferences.set({ key: KEY, value: JSON.stringify(p) });
   } catch {
     /* storage unavailable (private mode); progress is non-critical */
   }

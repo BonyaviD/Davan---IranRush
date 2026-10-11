@@ -12,6 +12,8 @@ export type Part = [THREE.BufferGeometry, ColorRole, number?];
 
 export interface CharacterDef {
   id: string;
+  /** Shop price in coins (0 = owned from the start). */
+  price?: number;
   /** Persian display name (DOM only). */
   name: string;
   desc: string;
@@ -74,6 +76,7 @@ const ring = (color: number, r = 0.24): Part => [at(cyl(r, r, 0.02, 20), 0, 0.01
 
 export const ARIAN: CharacterDef = {
   id: 'arian',
+  price: 0,
   name: 'آرین',
   desc: 'هودی، جین و کتونی',
   cloth: [0xf4f4f4, 0x2e2e2e, 0x9ec5e8, 0xf0c040, 0x9cc79c, 0xe07a5a],
@@ -95,6 +98,7 @@ export const ARIAN: CharacterDef = {
 
 export const TARA: CharacterDef = {
   id: 'tara',
+  price: 0,
   name: 'تارا',
   desc: 'تی‌شرت، جین و موی بلند',
   cloth: [0xf7c6d9, 0xffffff, 0xc9b6f0, 0xf6e27a, 0x9fe0d0, 0xe85d75],
@@ -114,8 +118,79 @@ export const TARA: CharacterDef = {
   ],
 };
 
-/** Playable characters, mixed in the player's crowd. */
-export const PLAYER_CHARACTERS: CharacterDef[] = [ARIAN, TARA];
+export const PARISA: CharacterDef = {
+  id: 'parisa',
+  price: 300,
+  name: 'پریسا',
+  desc: 'کت جین، کلاه بِره و موی کوتاه',
+  cloth: [0x4a6fa5, 0x2f2f38, 0xb5544a, 0x6b8f5a, 0xd9a441],
+  hair: [0x1a1410, 0x5a3420, 0x8a3b2a, 0xd8b06a],
+  parts: (marker) => [
+    ring(marker),
+    ...legs(0x2c2c34, 0xf4f4f4, 0x2c2c34),
+    [at(cyl(0.14, 0.16, 0.36), 0, 0.64, 0), 'cloth'],
+    [at(box(0.06, 0.2, 0.02), 0, 0.68, -0.15), 0xf4efe6],
+    ...arms('cloth', SKIN_B, 0.28),
+    [at(cyl(0.045, 0.05, 0.08), 0, 0.84, 0), SKIN_B],
+    [at(sph(0.165), 0, 0.99, 0), SKIN_B],
+    [at(sph(0.18, 0, Math.PI * 2, 0, Math.PI * 0.62), 0, 0.985, 0.015), 'hair'],
+    [at(sph(0.15).scale(1.25, 0.35, 1.25).rotateZ(0.25), 0.03, 1.15, 0.01), 0xc0392b],
+    [at(sph(0.025), 0.03, 1.21, 0.01), 0xc0392b],
+    ...face(0.99, SKIN_B, 0xd9606f),
+  ],
+};
+
+export const ARASH: CharacterDef = {
+  id: 'arash',
+  price: 600,
+  name: 'آرش کمانگیر',
+  desc: 'تیرانداز افسانه‌ای با کمان',
+  cloth: [0x2f6e4f, 0x8a5a2b, 0x3f5a8a, 0x7a2f2f],
+  hair: [0x1a1410, 0x3b2418],
+  parts: (marker) => [
+    ring(marker),
+    ...legs(0x5a4030, 0x6b4423, 0x3a2416),
+    [at(cyl(0.15, 0.2, 0.42), 0, 0.62, 0), 'cloth'],
+    [at(new THREE.TorusGeometry(0.17, 0.03, 6, 16).rotateX(Math.PI / 2), 0, 0.5, 0), GOLD],
+    ...arms('cloth', SKIN_A, 0.2),
+    [at(cyl(0.05, 0.055, 0.08), 0, 0.84, 0), SKIN_A],
+    [at(sph(0.17), 0, 1.0, 0), SKIN_A],
+    [at(sph(0.178, 0, Math.PI * 2, 0, Math.PI * 0.45), 0, 1.0, 0.01), 'hair'],
+    [at(new THREE.TorusGeometry(0.172, 0.022, 6, 18).rotateX(Math.PI / 2), 0, 1.04, 0), 0xc0392b],
+    [at(new THREE.TorusGeometry(0.32, 0.018, 6, 20, Math.PI * 0.9).rotateZ(Math.PI * 0.55), 0.02, 0.72, 0.17), 0x6b4423],
+    [at(cyl(0.05, 0.05, 0.3, 8), -0.08, 0.8, 0.16), 0x8a5a2b],
+    ...face(1.0, SKIN_A, 0xb4685a),
+  ],
+};
+
+export const ROSTAM: CharacterDef = {
+  id: 'rostam',
+  price: 1200,
+  name: 'رستم',
+  desc: 'پهلوان شاهنامه با کلاهخود و گرز',
+  cloth: [0xd98a2b, 0xc96f1f, 0xe0a040],
+  hair: [0x16100c],
+  parts: (marker) => [
+    ring(marker, 0.28),
+    ...legs(0x5a3a2a, 0x3a2416, 0x2a1a10),
+    [at(cyl(0.2, 0.22, 0.4), 0, 0.64, 0), 'cloth'],
+    [at(new THREE.TorusGeometry(0.21, 0.04, 6, 16).rotateX(Math.PI / 2), 0, 0.5, 0), GOLD],
+    ...arms(0x5a3a2a, 0xd9a07a, 0.22),
+    [at(cyl(0.06, 0.065, 0.08), 0, 0.86, 0), 0xd9a07a],
+    [at(sph(0.17), 0, 1.02, 0), 0xd9a07a],
+    [at(sph(0.185, 0, Math.PI * 2, 0, Math.PI * 0.5), 0, 1.03, 0), 0x9aa3ad],
+    [at(cone(0.04, 0.14, 8), 0, 1.24, 0), GOLD],
+    [at(box(0.2, 0.04, 0.05), 0, 0.95, -0.155), 'hair'],
+    [at(cone(0.09, 0.2, 9).rotateX(Math.PI), 0, 0.88, -0.1), 'hair'],
+    [at(cyl(0.025, 0.025, 0.45, 6), 0.26, 0.42, -0.05), 0x6b4423],
+    [at(sph(0.09), 0.26, 0.2, -0.05), 0x7a7f88],
+    ...face(1.02, 0xd9a07a, 0xa05a4a).filter((_, i) => i < 6 || i > 8),
+  ],
+};
+
+/** Every playable character, in shop order. Arian and Tara are free. */
+export const PLAYER_CHARACTERS: CharacterDef[] = [ARIAN, TARA, PARISA, ARASH, ROSTAM];
+export const characterById = (id: string): CharacterDef | undefined => PLAYER_CHARACTERS.find((c) => c.id === id);
 
 function divParts(marker: number, body: number, belly: number, limbs: number, horn: number): Part[] {
   return [
@@ -204,4 +279,12 @@ export const ZAHHAK: CharacterDef = {
   ],
 };
 
-export const BOSSES = { zahhak: ZAHHAK, 'div-sepid': DIV_SEPID } as const;
+/** Boss: Akvan Div, the green trickster div. */
+export const AKVAN: CharacterDef = {
+  id: 'akvan',
+  name: 'اکوان دیو',
+  desc: 'غول آخر: دیو سبز نیرنگ‌باز',
+  parts: (marker) => divParts(marker, 0x3f8a6e, 0x8fc9a8, 0x2f6a54, 0xf3e3c3),
+};
+
+export const BOSSES = { zahhak: ZAHHAK, 'div-sepid': DIV_SEPID, akvan: AKVAN } as const;

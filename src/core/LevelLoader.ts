@@ -38,5 +38,11 @@ export function validateLevel(level: LevelData): string[] {
     if (e.z >= boss.z) errors.push(`enemy at z=${e.z} is after the boss`);
     if (level.segments.some((s) => Math.abs(s.z - e.z) < 200)) errors.push(`enemy at z=${e.z} is too close to a gate`);
   }
+  for (const o of level.obstacles ?? []) {
+    if (o.halfWidth <= 0 || o.damage < 0) errors.push(`obstacle at z=${o.z} has bad size/damage`);
+    const fights = [...level.enemies.map((e) => e.z), boss.z];
+    if (fights.some((z) => Math.abs(z - o.z) < 150)) errors.push(`obstacle at z=${o.z} is inside a fight`);
+    if (level.segments.some((s) => Math.abs(s.z - o.z) < 120)) errors.push(`obstacle at z=${o.z} overlaps a gate`);
+  }
   return errors;
 }
